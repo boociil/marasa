@@ -2,10 +2,15 @@ import argparse
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import OllamaLLM
+from google import genai
+from dotenv import load_dotenv, find_dotenv
+import os
 
-from get_embedding_function import get_embedding_function
+load_dotenv(find_dotenv()) 
 
-CHROMA_PATH = "../chroma"
+from src.get_embedding_function import get_embedding_function
+
+CHROMA_PATH = "chroma"
 
 PROMPT_TEMPLATE = """
 Kamu adalah AI Statistical Research Assistant yang bekerja menggunakan Retrieval-Augmented Generation (RAG).
@@ -101,16 +106,6 @@ Jawab pertanyaan berdasarkan konteks di atas: {question}
 
 """
 
-
-def main():
-    # Create CLI.
-    parser = argparse.ArgumentParser()
-    parser.add_argument("query_text", type=str, help="The query text.")
-    args = parser.parse_args()
-    query_text = args.query_text
-    query_rag(query_text)
-
-
 def query_rag(query_text: str):
     # Prepare the DB.
     embedding_function = get_embedding_function()
@@ -127,14 +122,18 @@ def query_rag(query_text: str):
     # print(prompt)
 
     # model = OllamaLLM(model="gemma2:2b")
-    model = OllamaLLM(model="qwen3:0.6b")
-    response_text = model.invoke(prompt)
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    response_text = client.models.generate_content(
+        model="gemini-3-flash-preview", contents=prompt
+    )
+
+    print()
+
+    print(response_text.text)
+
+    print()
 
     sources = [doc.metadata.get("id", None) for doc, _score in results]
-    formatted_response = f"Response: {response_text}\nSources: {sources}"
+    formatted_response = f"Response: {response_text.text}\nSources: {sources}"
     print(formatted_response)
     return response_text
-
-
-if __name__ == "__main__":
-    main()
