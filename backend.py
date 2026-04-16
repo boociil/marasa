@@ -1,7 +1,8 @@
 import argparse
 from src.populate_database import main as populate_database_main
 from src.query_data import query_rag
-from src.download_pdf import download_main
+from src.download_pdf import download_pdf_main
+from src.download_data import download_main_data
 
 def populateChroma():
     print("📥 Running PopulateChrom...")
@@ -11,14 +12,19 @@ def populateChroma():
 def main():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--download", action="store_true", help="Download data.")
+    parser.add_argument("--download_pdf", action="store_true", help="Download data.")
+    parser.add_argument("--download_data", action="store_true", help="Reset the database.")
     parser.add_argument("--populate_chroma", action="store_true", help="Reset the database.")
     parser.add_argument("--query", type=str, help="Query data.")
 
+
     args = parser.parse_args()
 
-    if args.download:
-        download_main()
+    if args.download_pdf:
+        download_pdf_main()
+        return
+    if args.download_data:
+        download_main_data()
         return
     
     if args.populate_chroma:

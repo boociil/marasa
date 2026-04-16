@@ -1,17 +1,15 @@
-import argparse
 import os
 import shutil
+import argparse
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from src.get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
-import hashlib
 
 
 CHROMA_PATH = "chroma"
-DATA_PATH = "data/pdf"
-
+DATA_PATH = "data"
 
 def main():
 
@@ -30,15 +28,7 @@ def main():
 
 def load_documents():
     loader = PyPDFDirectoryLoader(DATA_PATH)
-    docs = loader.load()
-
-    # inject file hash ke metadata tiap page
-    for doc in docs:
-        source = doc.metadata.get("source")
-        doc.metadata["file_hash"] = get_file_hash(source)
-
-    return docs
-
+    return loader.load()
 
 def split_documents(documents: list[Document]):
     text_splitter = RecursiveCharacterTextSplitter(
@@ -49,52 +39,37 @@ def split_documents(documents: list[Document]):
     )
     return text_splitter.split_documents(documents)
 
-
 def add_to_chroma(chunks: list[Document]):
     db = Chroma(
         persist_directory=CHROMA_PATH,
-        embedding_function=get_embedding_function()
+        embedding_function=get_embedding_function() # Pastikan fungsi ini ada
     )
 
-    # ambil hash lama di DB
-    existing_hashes = get_existing_file_hashes(db)
+    # Identifikasi file apa saja yang ada di batch ingest kali ini
+    sources_to_ingest = set([chunk.metadata.get("source") for chunk in chunks])
 
-    # group chunk berdasarkan source file
-    chunks_by_source = {}
-    for chunk in chunks:
-        source = chunk.metadata["source"]
-        chunks_by_source.setdefault(source, []).append(chunk)
-
-    new_chunks = []
-
-    for source, file_chunks in chunks_by_source.items():
-        new_hash = file_chunks[0].metadata["file_hash"]
-        old_hash = existing_hashes.get(source)
-
-        # 🔥 jika file baru atau berubah → hapus lama + reingest
-        if old_hash != new_hash:
-            print(f"♻️ File changed or new: {source}")
-            delete_documents_by_source(db, source)
-            new_chunks.extend(file_chunks)
+    # Logika Overwrite: Hapus data lama berdasarkan path (source) jika ada di DB
+    for source in sources_to_ingest:
+        existing_items = db.get(where={"source": source})
+        if len(existing_items["ids"]) > 0:
+            # print(f"♻️ Overwriting: {source} (Deleting {len(existing_items['ids'])} old chunks)")
+            db.delete(ids=existing_items["ids"])
         else:
-            print(f"✅ File unchanged: {source}")
+            print(f"🆕 Adding new file: {source}")
 
-    # hitung chunk id
-    new_chunks = calculate_chunk_ids(new_chunks)
+    # Hitung Chunk ID baru
+    chunks_with_ids = calculate_chunk_ids(chunks)
 
-    if new_chunks:
-        print(f"👉 Adding documents: {len(new_chunks)} chunks")
-        ids = [c.metadata["id"] for c in new_chunks]
-        db.add_documents(new_chunks, ids=ids)
+    # Tambahkan semua chunk ke database
+    if chunks_with_ids:
+        print(f"👉 Adding documents: {len(chunks_with_ids)} chunks")
+        new_ids = [c.metadata["id"] for c in chunks_with_ids]
+        db.add_documents(chunks_with_ids, ids=new_ids)
     else:
-        print("🎉 Database already up-to-date")
-
+        print("✅ No new documents to add.")
 
 def calculate_chunk_ids(chunks):
-
-    # This will create IDs like "data/monopoly.pdf:6:2"
-    # Page Source : Page Number : Chunk Index
-
+    # Format ID: "path/ke/file.pdf:nomor_halaman:index_chunk"
     last_page_id = None
     current_chunk_index = 0
 
@@ -103,50 +78,17 @@ def calculate_chunk_ids(chunks):
         page = chunk.metadata.get("page")
         current_page_id = f"{source}:{page}"
 
-        # If the page ID is the same as the last one, increment the index.
         if current_page_id == last_page_id:
             current_chunk_index += 1
         else:
             current_chunk_index = 0
 
-        # Calculate the chunk ID.
         chunk_id = f"{current_page_id}:{current_chunk_index}"
         last_page_id = current_page_id
-
-        # Add it to the page meta-data.
         chunk.metadata["id"] = chunk_id
 
     return chunks
 
-
 def clear_database():
     if os.path.exists(CHROMA_PATH):
         shutil.rmtree(CHROMA_PATH)
-
-def get_file_hash(file_path: str) -> str:
-    hasher = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        while chunk := f.read(8192):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-def get_existing_file_hashes(db: Chroma):
-    data = db.get(include=["metadatas"])
-    hashes = {}
-
-    for meta in data["metadatas"]:
-        source = meta.get("source")
-        file_hash = meta.get("file_hash")
-        if source and file_hash:
-            hashes[source] = file_hash
-
-    return hashes
-
-def delete_documents_by_source(db: Chroma, source: str):
-    results = db.get(where={"source": source})
-    ids = results["ids"]
-
-    if ids:
-        print(f"🗑️ Removing old chunks for: {source} ({len(ids)} chunks)")
-        db.delete(ids=ids)
-
