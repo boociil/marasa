@@ -10,7 +10,7 @@ load_dotenv(find_dotenv())
 
 from src.get_embedding_function import get_embedding_function
 
-CHROMA_PATH = "chroma"
+CHROMA_PATH = os.getenv('CHROMA_PATH')
 
 PROMPT_TEMPLATE = """
 Kamu adalah AI Statistical Research Assistant yang bekerja menggunakan Retrieval-Augmented Generation (RAG).

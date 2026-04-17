@@ -8,8 +8,8 @@ from src.get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
 
 
-CHROMA_PATH = "chroma"
-DATA_PATH = "data"
+CHROMA_PATH = os.getenv('CHROMA_PATH')
+DATA_PATH = os.getenv('DATA_PATH')
 
 def main():
 

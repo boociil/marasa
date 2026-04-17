@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 # from src.query_data import query_rag
-# from src.graph.main import main_chat
+from src.graph.main import main_chat
 
 app = FastAPI()
 
@@ -17,5 +17,5 @@ class Param(BaseModel):
 @app.post("/")
 def read_root(param: Param):
     if param.isfromMe :
-        return ['Hi', 'kamu', param.name, "tes"]
+        return main_chat(param.phoneNumber, param.name, param.text, param.isfromMe)
     # return main_chat(phoneNumber, name, text, isfromMe)
