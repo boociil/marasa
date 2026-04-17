@@ -1,9 +1,21 @@
 from fastapi import FastAPI
-from src.query_data import query_rag
+from pydantic import BaseModel
+# from src.query_data import query_rag
+# from src.graph.main import main_chat
 
 app = FastAPI()
 
+class Param(BaseModel):
+   jid: str
+   phoneNumber: str
+   name: str
+   text: list[str]
+   isfromMe: bool
 
-@app.get("/")
-def read_root(query_text: str):
-    return query_rag(query_text)
+
+
+@app.post("/")
+def read_root(param: Param):
+    if param.isfromMe :
+        return ['Hi', 'kamu', param.name, "tes"]
+    # return main_chat(phoneNumber, name, text, isfromMe)

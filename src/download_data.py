@@ -43,7 +43,7 @@ def get_table(subject ):
 
 def get_detail_table(id ):
     """Mengambil semua subjek (CSA) yang tersedia"""
-    url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/id/{id}/key/{API_KEY}/"
+    url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
     print(url)
     while True: 
         response = requests.get(url).json()
@@ -54,19 +54,14 @@ def download_main_data():
     categories = get_categories()
     
     for cate in categories:
-        print(cate)
-        # Filter jika user minta subjek tertentu (misal: Sosial saja)
-            
-        # print(f"\n[Categories] {cate['title']} (ID: {cate['subcat_id']})")
-        
         subject_a = get_subjects(cate['subcat_id'])
         for subjec in subject_a:
-            print(subjec)
             tables = get_table(subjec['sub_id'])
             for item in tables :
-                print(item)
-                get_detail_table(item['id'])
+                abc = get_detail_table(item['id'])
+                print(abc)
                 break
             break
-        break
+        break 
+        
             
