@@ -1,4 +1,3 @@
-from langchain_chroma import Chroma
 from src.graph.rag.chroma_client import get_vectorstore
 from src.get_embedding_function import get_embedding_function
 

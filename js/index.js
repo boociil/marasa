@@ -85,6 +85,36 @@ async function connectToWhatsApp() {
 
       const sendMessage = (jid, teks) => waSocket.sendMessage(jid, { text: teks });
 
+      async function repeat_timer(jid_local, isfromMe_local){
+        if(!isfromMe_local){
+          return
+        }
+        const allMessages = messageBuffer.get(jid_local)
+
+        try {
+          const response = await fetch(process.env.PYTHON_URL, {body : JSON.stringify(allMessages), method: 'POST',  
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+          }});
+          if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+          }
+          const result = await response.json();
+
+          result.forEach(element => {
+              sendMessage(jid_local, element)
+          });
+
+          messageBuffer.delete(jid_local)
+          debounceTimers.delete(jid_local)
+        } catch (error) {
+          console.error(error.message);
+          debounceTimers.delete(jid_local)
+          debounceTimers.set(jid_local, setTimeout(() => { repeat_timer(jid_local, isfromMe_local)}, DEBOUNCE_MS))
+        }
+      }
+
       if (type !== 'notify') return;
 
         for (const msg of messages) {
@@ -120,35 +150,7 @@ async function connectToWhatsApp() {
               clearTimeout(debounceTimers.get(jid))
             }
 
-            const timer = setTimeout(async () => {
-              if(!isfromMe){
-                return
-              }
-              const allMessages = messageBuffer.get(jid)
-              messageBuffer.delete(jid)
-              debounceTimers.delete(jid)
-
-              try {
-                const response = await fetch(process.env.PYTHON_URL, {body : JSON.stringify(allMessages), method: 'POST',  
-                  headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                }});
-                if (!response.ok) {
-                  throw new Error(`Response status: ${response.status}`);
-                }
-                const result = await response.json();
-
-                result.forEach(element => {
-                    sendMessage(jid, element)
-                });
-              } catch (error) {
-                console.error(error.message);
-              }
-
-            }, DEBOUNCE_MS)
-
-            debounceTimers.set(jid, timer)
+            debounceTimers.set(jid, setTimeout(() => { repeat_timer(jid, isfromMe)}, DEBOUNCE_MS))
 
         }
     })

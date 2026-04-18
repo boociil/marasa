@@ -106,9 +106,6 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
     builder.add_node("end_checker", end_checker)
 
 
-    
-    
-
     builder.add_edge(START, "end_checker")
 
     def followup_end_checker(state):
@@ -148,4 +145,5 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
 
     result = graph.invoke(state)
     print(result["answer"])
+    return result["answer"]
 

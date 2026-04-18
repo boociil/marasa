@@ -17,5 +17,11 @@ class Param(BaseModel):
 @app.post("/")
 def read_root(param: Param):
     if param.isfromMe :
+        print("main_chat")
         return main_chat(param.phoneNumber, param.name, param.text, param.isfromMe)
     # return main_chat(phoneNumber, name, text, isfromMe)
+
+@app.post("/health_check")
+def health_check():
+    print("health_check")
+    return["a", "b"]
