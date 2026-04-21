@@ -6,8 +6,10 @@ import os
 
 load_dotenv(find_dotenv()) 
 
+ai_disclaimen = "*AI dapat membuat kesalahan"
 
 def data_or_analysis_router(state):
+    history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
     new_chat = "\n".join(state["new_chat"])
 
     prompt = f"""
@@ -16,42 +18,54 @@ def data_or_analysis_router(state):
     DATA → mencari tabel, dataset, angka, link data
     ANALYSIS → meminta penjelasan, tren, penyebab, interpretasi
 
+    Riwayat percakapan:
+    {history}
+
     Pertanyaan: {new_chat}
 
     Jawab Hanya: data / analysis /keduanya
     """
 
     state["rag_type"] = llm_query(prompt, os.getenv('Whatsapp7600_04_Api_KEY')).strip()
-    print(state["rag_type"])
+    # print(state["rag_type"])
     return state
 
 def rag_rewrite_query(state):
-    print("rag_rewrite_query")
-    history = "\n".join(state["chat_history"])
+    # print("rag_rewrite_query")
+    history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
+
     new_chat = "\n".join(state["new_chat"])
 
     prompt = f"""
-Ubah menjadi pertanyaan mandiri untuk retrival data  :
+Tugas: Ubah percakapan berikut menjadi pertanyaan mandiri untuk kebutuhan retrieval data.
+
+Riwayat percakapan:
 {history}
 
+Pertanyaan baru:
 Q:{new_chat}
 
-jika tidak ada tahun spesifik masukkan tahun terbaru (contoh : pada tahun 2026)
-jika tidak ada lokasi spesifik masukkan sulawesi barat (contoh : di sulawesi barat)
+Aturan:
 
-jika pertanyaan dibuat secara umum buat rinciannya 
+1. Gabungkan konteks riwayat dan pertanyaan baru menjadi satu pertanyaan mandiri yang lengkap dan jelas.
+2. Jika tidak ada tahun spesifik, tambahkan tahun terbaru (2026).
+    Contoh: “pada tahun 2026”
+3. Jika tidak ada lokasi spesifik, tambahkan Sulawesi Barat.
+    Contoh: “di Sulawesi Barat”
+4. Jika pertanyaan masih bersifat umum, buat menjadi spesifik dan sangat rinci.
+5. Jangan mengulang instruksi, jangan meminta konfirmasi, dan jangan menambahkan penjelasan.
 
-tahun terbaru saat ini 2026
-
-langsug berikan pertanyaa mandirinya jangan mengulang dan bertanya ulang
+Output:
+Pertanyaan mandiri.
 """
-    
+    # print(history)
+    # print(state["new_chat"])
     state["rag_query"] = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'))
     print(state["rag_query"])
     return state
 
 def rag_search(state):
-    print("rag_search")
+    # print("rag_search")
 
     if state["rag_type"].lower() == 'data' :
         docs_table = get_rag_data_table(state["rag_query"])
@@ -73,14 +87,16 @@ def rag_search(state):
 
         docs_table = get_rag_data_table(state["rag_query"])
         url_ = []
+        judul_ =[]
         for doc, _score in docs_table :
             url_.append('https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html')
+            judul_.append(doc.metadata.get("judul", None))
         state["rag_table_url"] = url_
-        state["rag_table_judul"] = [doc.page_content for doc, _score in docs_table]
+        state["rag_table_judul"] = judul_
         return state
 
 def rag_answer(state):
-    print("rag_answer")
+    # print("rag_answer")
 
     if state["rag_type"].lower() == 'data' :
         if len(state["rag_table_judul"]) == 0 :
@@ -91,7 +107,7 @@ def rag_answer(state):
                 title = state["rag_table_judul"][i]
                 url = state["rag_table_url"][i]
                 text += f"{i+1}. {title}\n   {url}\n\n"
-            state["answer"] = [text]
+            state["answer"] = [text, ai_disclaimen]
         return state
     elif state["rag_type"].lower() == 'analysis' :
         new_chat = "\n".join(state["new_chat"])
@@ -99,7 +115,7 @@ def rag_answer(state):
             context=state["rag_context_pdf"],
             question=new_chat
         )
-        state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY'))]
+        state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY')), ai_disclaimen]
         return state
     else :
         new_chat = "\n".join(state["new_chat"])
@@ -115,11 +131,11 @@ def rag_answer(state):
                 title = state["rag_table_judul"][i]
                 url = state["rag_table_url"][i]
                 text += f"{i+1}. {title}\n   {url}\n\n"
-            state["answer"] = [text]
+            state["answer"] = [text[:-4]]
 
         if text == "" :
-            state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY'))]
+            state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY')), ai_disclaimen]
         else :
-            state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY')), text]
+            state["answer"] = [llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY')), text, ai_disclaimen]
         return state
        

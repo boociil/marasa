@@ -16,9 +16,12 @@ class Param(BaseModel):
 
 @app.post("/")
 def read_root(param: Param):
-    if param.isfromMe :
-        print("main_chat")
+    # print("main")
+    # print(param.phoneNumber)
+    if param.phoneNumber in ['6281342774989', '6281399152242', '6282344852209', '6285255178499', '6285342419813', '6281218189650']:
         return main_chat(param.phoneNumber, param.name, param.text, param.isfromMe)
+    else :
+        return []
     # return main_chat(phoneNumber, name, text, isfromMe)
 
 @app.post("/health_check")

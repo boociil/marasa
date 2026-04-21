@@ -14,4 +14,10 @@ def get_rag_data_table(query_text):
     results = db.similarity_search_with_score(query_text, k=10)
     # results = db.imilarity_search_with_score(query_text, k=10)
 
-    return results
+    filtered_docs_with_scores = [
+        (doc, score) 
+        for doc, score in results
+        if score <= 0.75
+    ]
+
+    return filtered_docs_with_scores

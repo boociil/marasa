@@ -91,7 +91,7 @@ Jenis sumber: {sumber}."""
                 while page_2 <= pages_2:            
                     tables, pages_2_ = get_table(subjec['sub_id'], page_2)
                     if pages_2_ is not None :
-                        page_2 = pages_2_
+                        pages_2 = pages_2_
                     for item in tables :
                         print("Table : "+item["title"])
                         tablesource = ""

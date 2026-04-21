@@ -5,6 +5,7 @@ def set_layanan(state):
     session, baru_status = get_or_create_active_session(state['notelp'])
     state["session_id"] = session.get_id()
     state["layanan_type"] = session.layanan
+    state["chat_history"] = load_last_messages(session)
 
     if state["layanan_type"] == 0:
         number = 0
@@ -18,8 +19,7 @@ def set_layanan(state):
             state['layanan_type'] = number
             state["answer"] = ["Apa yang bisa kami bantu hari ini?"]
             state['is_done'] = True
-            state["is_system"] = True
-            state["chat_history"] = load_last_messages(session)
+            state["is_system"] = True  
         else :
             state["answer"] = [menu_bps]
             state['is_done'] = True

@@ -98,7 +98,6 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
     graph = builder.compile()
     result = graph.invoke(state)
 
-    print(result)
 
     try:
         session = ChatSession.get_by_id(result['session_id'])

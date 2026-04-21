@@ -113,9 +113,9 @@ def load_last_messages(session: ChatSession):
     content = []
 
     for item in messages: 
-        if item.role == 'user':
+        if item.role == 'user' and item.content != '':
             content.append('user : '+item.content)
-        elif item.role == 'bot':
+        elif item.role == 'bot' and item.content != '':
             content.append('bot : '+item.content)
 
     return content

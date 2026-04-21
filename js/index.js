@@ -1,5 +1,5 @@
 // const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require("baileys")
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from 'baileys';
+import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, jidDecode } from 'baileys';
 import pino from 'pino';
 import chalk from 'chalk';
 import readline from 'node:readline';
@@ -86,7 +86,7 @@ async function connectToWhatsApp() {
       const sendMessage = (jid, teks) => waSocket.sendMessage(jid, { text: teks });
 
       async function repeat_timer(jid_local, isfromMe_local){
-        if(!isfromMe_local){
+        if(isfromMe_local){
           return
         }
         const allMessages = messageBuffer.get(jid_local)
@@ -124,10 +124,15 @@ async function connectToWhatsApp() {
             const sender = msg.key.remoteJid
             const name = msg.pushName || "waSocket"
 
-            const jid = msg.key.remoteJid
-            // if (!jid.endsWith("@s.whatsapp.net")) return
-            const phoneNumber = jid.split("@")[0].split("-")[0]
+            const jid = msg.key.remoteJid.startsWith("62") ? msg.key.remoteJid :  msg.key.remoteJidAlt
+            if (!jid) return
+            if (jid.endsWith("@g.us")) return
+            if (msg.message.protocolMessage) return;
 
+            const decode = jidDecode(jid);
+            const phoneNumber = decode.user.split("@")[0].split("-")[0]
+            // console.log(phoneNumber)
+            // console.log(msg.message)
 
             const text =
               msg.message.conversation ||
@@ -138,19 +143,19 @@ async function connectToWhatsApp() {
 
             const isfromMe = msg.key.fromMe
 
-            if (!messageBuffer.has(jid)) {
-              messageBuffer.set(jid, {'jid': jid, 'phoneNumber': phoneNumber, 'name': name, text: [], isfromMe: isfromMe})
+            if (!messageBuffer.has(msg.key.remoteJid)) {
+              messageBuffer.set(msg.key.remoteJid, {'jid': msg.key.remoteJid, 'phoneNumber': phoneNumber, 'name': name, text: [], isfromMe: isfromMe})
             }
-            messageBuffer.get(jid)['text'].push(text)
+            messageBuffer.get(msg.key.remoteJid)['text'].push(text)
 
             // ===============================
             // 2. Reset timer debounce
             // ===============================
-            if (debounceTimers.has(jid)) {
-              clearTimeout(debounceTimers.get(jid))
+            if (debounceTimers.has(msg.key.remoteJid)) {
+              clearTimeout(debounceTimers.get(msg.key.remoteJid))
             }
 
-            debounceTimers.set(jid, setTimeout(() => { repeat_timer(jid, isfromMe)}, DEBOUNCE_MS))
+            debounceTimers.set(msg.key.remoteJid, setTimeout(() => { repeat_timer(msg.key.remoteJid, isfromMe)}, DEBOUNCE_MS))
 
         }
     })
