@@ -21,10 +21,10 @@ Kebutuhan lain yang belum termasuk menu di atas.
 Silakan ketik *angka pilihan Anda* 😊"""
 
 Form_Identitas = """Nama Lengkap : 
-Email :
-Tahun Lahir :
-Pekerjaan :
-Instansi/Tempat Aktivitas Sehari-hari :"""
+Email : 
+Tahun Lahir : 
+Pekerjaan : 
+Instansi/Tempat Aktivitas Sehari-hari : """
 
 
 LLM_PROMPT = """

@@ -13,11 +13,16 @@ class BPSState(TypedDict):
     
     # rag
     use_ai: bool
+    rag_type: Optional[str]
     rag_query: Optional[str]
-    rag_context: list[str]
-    rag_source: list[str]
+    rag_context_pdf: list[str]
+
+    rag_table_url: list[str]
+    rag_table_judul: list[str]
+    # rag_source: list[str]
     
     # outputs
     answer: list[str]
     new_chat: List[str]
     chat_history: List[str]
+    is_system: bool

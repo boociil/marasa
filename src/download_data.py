@@ -111,9 +111,11 @@ Jenis sumber: {sumber}."""
                             akhir=item["latest_period"],
                             sumber=tablesource,
                         ), metadata={
+                            'judul': item["title"],
                             'subcat_id': cate['subcat_id'],
                             'sub_id': subjec['sub_id'],
-                            'table_id' : item['id']
+                            'table_id' : item['id'],
+                            'sumber': item['tablesource']
                         }))
                     page_2 += 1
             page_1 += 1

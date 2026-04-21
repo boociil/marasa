@@ -20,6 +20,7 @@ class ChatSession(BaseModel):
         null=True   # 🔥 ini kuncinya
     )
     layanan = SmallIntegerField(default=0) #0
+    use_ai = BooleanField(default=False)
     is_done = BooleanField(default=False)
     need_human = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.datetime.now)

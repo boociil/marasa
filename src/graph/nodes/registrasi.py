@@ -36,6 +36,8 @@ def registrasi(state):
                 "Mohon mengisi form identitas untuk dokumentasi kami",
                 Form_Identitas
             ]
+            state['is_done'] = True
+            state["is_system"] = True
         else :
             try :
                 user =  User.create(
@@ -51,5 +53,5 @@ def registrasi(state):
                     "Mohon mengisi identitas dengan menyalin form"
                 ]
                 state['is_done'] = True
-            
+                state["is_system"] = True
     return state

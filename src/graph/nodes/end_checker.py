@@ -6,7 +6,7 @@ load_dotenv(find_dotenv())
 
 def end_checker(state) -> bool:
     if len(state['chat_history']) == 0 :
-        state['is_done'] = False
+        state['session_done'] = False
         return state
     last_user_msg = state['new_chat'][len(state['new_chat']) - 1]
     prompt = f"""
@@ -17,7 +17,7 @@ Apakah user sudah puas dan ingin mengakhiri percakapan?
 Jawab hanya: YES atau NO
 """
 
-    state['is_done'] = llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY')) == "YES"
+    state['session_done'] = llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY')) == "YES"
     return state
        
         

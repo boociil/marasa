@@ -1,3 +1,3 @@
 def konsultasi(state):
-    state['answer'] = ['Kami akan menghubungkan kamu dengan Petugas Layanan']
+    state['answer'] = ["Kami akan segera menghubungkan Anda dengan petugas kami."]
     return state
