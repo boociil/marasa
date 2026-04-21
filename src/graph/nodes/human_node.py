@@ -34,14 +34,26 @@ def human_node(state):
 
     if detect_human_request(text):
         state['need_human'] = True
+        if state['use_ai'] == True : 
+            state["answer"] = [
+                "Kami akan segera menghubungkan Anda dengan petugas kami."
+            ]
         return state
 
     if detect_frustration(text):
         state['need_human'] = True
+        if state['use_ai'] == True : 
+            state["answer"] = [
+                "Kami akan segera menghubungkan Anda dengan petugas kami."
+            ]
         return state
 
     if len(state['chat_history']) + len(state['new_chat']) == 15:
         state['need_human'] = True
+        if state['use_ai'] == True : 
+            state["answer"] = [
+                "Kami akan segera menghubungkan Anda dengan petugas kami."
+            ]
         return state
 
     return state
