@@ -1,8 +1,8 @@
 import argparse
-from src.populate_database import main as populate_database_main
+from src.populate_pdf import main as populate_database_main
+from src.populate_data import download_main_data
 from src.query_data import query_rag
 from src.download_pdf import download_pdf_main
-from src.download_data import download_main_data
 from src.graph.db.init_db import init_db
 
 def populateChroma():

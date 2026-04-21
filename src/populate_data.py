@@ -53,6 +53,7 @@ def get_table(subject, page):
 def get_detail_table(id ):
     """Mengambil semua subjek (CSA) yang tersedia"""
     url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
+    print(url)
     while True: 
         response = requests.get(url).json()
         if response['status'] == 'OK':
@@ -93,6 +94,7 @@ Jenis sumber: {sumber}."""
                     if pages_2_ is not None :
                         pages_2 = pages_2_
                     for item in tables :
+                        get_detail_table(item['id'])
                         print("Table : "+item["title"])
                         tablesource = ""
                         if item['tablesource'] == '1':
