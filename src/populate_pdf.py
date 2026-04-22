@@ -60,8 +60,16 @@ def populate_pdf():
                 "rl_date": item['rl_date'],
                 "updt_date": item['updt_date'],
             })
-            chunks = split_documents(documents)
-            add_to_chroma(chunks, db)
+            chunk_size_ = 800
+            while True:
+                try:
+                    chunks = split_documents(documents, chunk_size_)
+                    add_to_chroma(chunks, db)
+                    print("chunk size : "+str(chunk_size_))
+                    break
+                except Exception as e:
+                    print(e)
+                    chunk_size_ = chunk_size_ - 50
             print()
 
             with open(os.getenv('PATH_LAST'), 'w') as f:
@@ -88,8 +96,16 @@ def populate_pdf():
                 "rl_date": item['rl_date'],
                 "updt_date": item['updt_date'],
             })
-            chunks = split_documents(documents)
-            add_to_chroma(chunks, db)
+            chunk_size_ = 800
+            while True:
+                try:
+                    chunks = split_documents(documents, chunk_size_)
+                    add_to_chroma(chunks, db)
+                    print("chunk size : "+str(chunk_size_))
+                    break
+                except Exception as e:
+                    print(e)
+                    chunk_size_ = chunk_size_ - 50
             print()
 
             with open(os.getenv('PATH_LAST'), 'w') as f:
@@ -124,9 +140,9 @@ def load_documents():
     loader = PyPDFDirectoryLoader(DATA_PATH)
     return loader.load()
 
-def split_documents(documents: list[Document]):
+def split_documents(documents: list[Document], chunk_size_: int):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
+        chunk_size=chunk_size_,
         chunk_overlap=150,
         length_function=len,
         is_separator_regex=False,

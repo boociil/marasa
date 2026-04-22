@@ -39,8 +39,11 @@ def populate_image():
         if not os.path.exists(path):
             continue
 
-        os.makedirs(path_folder, exist_ok=True)
+        if os.path.exists(path_folder):
+            continue
+
         if MULAI_ENBED :
+            os.makedirs(path_folder, exist_ok=True)
             pages = convert_from_path(path, 200)
 
             i = 1
@@ -62,8 +65,11 @@ def populate_image():
         if not os.path.exists(path):
             continue
 
-        os.makedirs(path_folder, exist_ok=True)
+        if os.path.exists(path_folder):
+            continue
+
         if MULAI_ENBED :
+            os.makedirs(path_folder, exist_ok=True)
             pages = convert_from_path(path, 200)
 
             i = 1
