@@ -59,7 +59,7 @@ def get_detail_table(id ):
         if response['status'] == 'OK':
             return response['data'][1]
         
-def download_main_data():
+def populate_table():
 
     db = Chroma(
         persist_directory=CHROMA_PATH,

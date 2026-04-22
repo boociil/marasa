@@ -19,7 +19,7 @@ DATA_PATH = os.getenv('DATA_PATH')
 PDF_JSON = os.getenv('PDF_JSON')
 PATH_LAST = os.getenv('PATH_LAST')
 
-def main():
+def populate_pdf():
 
     db = Chroma(
         persist_directory=CHROMA_PATH,

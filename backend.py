@@ -1,36 +1,39 @@
 import argparse
-from src.populate_pdf import main as populate_database_main
-from src.populate_data import download_main_data
-from src.query_data import query_rag
 from src.download_pdf import download_pdf_main
-from src.graph.db.init_db import init_db
+from src.populate_pdf import populate_pdf
+from src.populate_data import populate_table
+from src.populate_image import populate_image
+from src.query_data import query_rag
 
-def populateChroma():
-    print("📥 Running PopulateChrom...")
-    populate_database_main()
+from src.graph.db.init_db import init_db
+    
 
 
 def main():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--download_pdf", action="store_true", help="Download data.")
-    parser.add_argument("--download_data", action="store_true", help="Reset the database.")
-    parser.add_argument("--populate_chroma", action="store_true", help="Reset the database.")
+    parser.add_argument("--populate_table", action="store_true", help="Populate table.")
+    parser.add_argument("--populate_pdf", action="store_true", help="Populate pdf.")
+    parser.add_argument("--populate_image", action="store_true", help="Populate image.")
     parser.add_argument("--query", type=str, help="Query data.")
-    parser.add_argument("--create_db", action="store_true", help="Reset the database.")
+    parser.add_argument("--create_db", action="store_true", help="Create DB.")
 
 
     args = parser.parse_args()
 
     if args.download_pdf:
         download_pdf_main()
+        return    
+    if args.populate_pdf:
+        print("📥 Running PopulateChrom...")
+        populate_pdf()
         return
-    if args.download_data:
-        download_main_data()
+    if args.populate_table:
+        populate_table()
         return
-    
-    if args.populate_chroma:
-        populateChroma()
+    if args.populate_image:
+        populate_image()
         return
     
     if args.query:
