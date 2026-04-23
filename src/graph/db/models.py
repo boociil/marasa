@@ -4,6 +4,7 @@ import datetime
 
 class User(BaseModel):
     nama = CharField(max_length=255)
+    jid = CharField(unique=True, max_length=100)
     notelp = CharField(unique=True, max_length=15)
     email = CharField(unique=True, max_length=255, null=True)
     nama_lengkap = CharField(max_length=255, null=True)

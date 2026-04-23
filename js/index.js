@@ -13,9 +13,9 @@ connectToWhatsApp()
 // endpoint kirim pesan
 app.post("/send-message", upload.single("image"), async (req, res) => {
     try {
-        const { jid, answers } = req.body
+        const { jid, text } = req.body
 
-        if (!jid || !answers)
+        if (!jid || !text)
             return res.status(400).json({ error: "jid & answers required" })
 
         const sock = getSocket()
@@ -28,7 +28,7 @@ app.post("/send-message", upload.single("image"), async (req, res) => {
             payload = {
                 image: file.buffer, // <- buffer dari multer
                 mimetype: file.mimetype,
-                caption: message || ""
+                caption: text || ""
             }
         }else if (message) {
             payload = { text: message }

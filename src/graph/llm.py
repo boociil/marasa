@@ -15,13 +15,13 @@ load_dotenv(find_dotenv())
 #     return response_text
 
 
-def llm_query(prompt: str, api_key_s) :
+def llm_query(prompt: str, api_key_s, config) :
     client = genai.Client(api_key=api_key_s)
 
     while True:
         try:
             response = client.models.generate_content(
-                model="gemini-3.1-flash-lite-preview", contents=prompt
+                model="gemini-3.1-flash-lite-preview", contents=prompt, config=config
             )
             if response and response.text:
                 print(response.text)

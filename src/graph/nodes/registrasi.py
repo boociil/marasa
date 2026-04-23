@@ -41,6 +41,7 @@ def registrasi(state):
         else :
             try :
                 user =  User.create(
+                    jid = state['jid'],
                     nama = state['nama'],
                     notelp = state['notelp'],
                     email = extract_form['email'],

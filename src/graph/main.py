@@ -3,17 +3,17 @@ from langgraph.graph import StateGraph, START, END
 from src.graph.state import BPSState
 from src.graph.nodes.registrasi import registrasi
 from src.graph.nodes.set_layanan import set_layanan
-from src.graph.nodes.rag import data_or_analysis_router, rag_rewrite_query, rag_search, rag_answer
+from src.graph.nodes.rag import pecah_question, transform_untuk_rag, rag_search, rag_validate, rag_answer
 from src.graph.nodes.complaint import create_ticket
 from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
 from src.graph.nodes.konsultasi import konsultasi
 
-from src.graph.db.models import User, ChatSession, ChatMessage, Ticket, get_user_by_phone, get_or_create_active_session, load_last_messages
+from src.graph.db.models import ChatSession, ChatMessage
 
 
 
-def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
 
     state = {
         "session_id": None,
@@ -21,19 +21,16 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
         "layanan_type": 0,
         "need_human": False,
         "is_done": False,
-    
+
+        "jid": jid,
         "nama": name,
         "notelp": phoneNumber,
-        
-        "answer": [],
-        "new_chat": text,
-        "chat_history": [],
 
         "use_ai": False,
-        "is_system": False,
+        "question": [],
 
-        "rag_table_id": [],
-        "rag_judul": [],
+        "new_chat": text,
+        "chat_history": [],
     }
 
     builder = StateGraph(BPSState)
@@ -45,9 +42,11 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
     builder.add_node("human_node", human_node)
     builder.add_node("konsultasi", konsultasi)
     builder.add_node("create_ticket", create_ticket)
-    builder.add_node("data_or_analysis_router", data_or_analysis_router)
-    builder.add_node("rag_rewrite_query", rag_rewrite_query)
+
+    builder.add_node("pecah_question", pecah_question)
+    builder.add_node("transform_untuk_rag", transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
+    builder.add_node("rag_validate", rag_validate)
     builder.add_node("rag_answer", rag_answer)
     
 
@@ -79,7 +78,7 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
                 case 3 :
                     return "create_ticket"
                 case 4 :
-                    return "data_or_analysis_router"
+                    return "pecah_question"
                 case 5 :
                     return "konsultasi"
         else :
@@ -91,10 +90,12 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
     builder.add_edge("konsultasi", END)
     builder.add_edge("create_ticket", END)
 
-    builder.add_edge("data_or_analysis_router", "rag_rewrite_query")
-    builder.add_edge("rag_rewrite_query", "rag_search")
-    builder.add_edge("rag_search", "rag_answer")
+    builder.add_edge("pecah_question", "transform_untuk_rag")
+    builder.add_edge("transform_untuk_rag", "rag_search")
+    builder.add_edge("rag_search", "rag_validate")
+    builder.add_edge("rag_validate", "rag_answer")
     builder.add_edge("rag_answer", END)
+
     graph = builder.compile()
     result = graph.invoke(state)
 
@@ -122,6 +123,11 @@ def main_chat(phoneNumber: str, name: str, text: list[str], isfromMe: bool):
         session.save()
     except ChatSession.DoesNotExist:
         print()
+
+    answer = []
+    for item_ques in result['question']:
+        for item_answer in item_ques.answer:
+            answer.append(item_answer)
     
-    return result["answer"]
+    return jid, answer
 

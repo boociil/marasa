@@ -1,4 +1,54 @@
 from typing import TypedDict, List, Optional
+from pydantic import BaseModel
+from typing import Optional
+
+class RagPublikasiBRS(BaseModel):
+    id: str
+    brs_id: Optional[str]
+    title: str 
+    halaman: int
+    content: str
+    rl_date: str
+    score: float
+    def print(self):
+        return f"""ID Pengetahuan :  {self.id}
+Julu : {self.title}
+content : {self.content}
+Release : {self.rl_date}
+"""
+
+class RagData(BaseModel):
+    id: str
+    judul: str 
+    url: str
+    content: str
+    rl_date: str
+    score: float
+    def print(self):
+        return f"""ID Pengetahuan :  {self.id}
+Julu : {self.judul}
+content : {self.content}
+Release : {self.rl_date}
+Url : {self.url}
+"""
+
+class AnswerModel(BaseModel):
+    type: str #file, text, system
+    file_path: Optional[str] 
+    text: Optional[str] 
+
+class QuestionModel(BaseModel):
+    ques: str
+    rag_ques: str
+    answer: list[AnswerModel] = []
+    rag_publikasi_brs: list[RagPublikasiBRS] = []
+    rag_data: list[RagData] = []
+    rag_publikasi_brs_output: list[RagPublikasiBRS] = []
+    rag_data_output: list[RagData] = []
+
+class ChatMessage(BaseModel):
+    role = str
+    content = str
 
 class BPSState(TypedDict):
     session_id: Optional[str]
@@ -7,22 +57,14 @@ class BPSState(TypedDict):
     need_human: bool
     is_done: bool
     
+    jid: str
     nama: str
     notelp: str
-    nama_lengkap: Optional[str]
     
     # rag
     use_ai: bool
-    rag_type: Optional[str]
-    rag_query: Optional[str]
-    rag_context_pdf: list[str]
-
-    rag_table_url: list[str]
-    rag_table_judul: list[str]
-    # rag_source: list[str]
-    
+    question: List[QuestionModel]
+   
     # outputs
-    answer: list[str]
     new_chat: List[str]
-    chat_history: List[str]
-    is_system: bool
+    chat_history: List[ChatMessage]

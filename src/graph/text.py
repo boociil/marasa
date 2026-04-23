@@ -71,7 +71,7 @@ Struktur:
 [tahun data]
 
 📚 Sumber:
-[nama dokumen / institusi jika tersedia di context]
+[nama dokumen / institusi jika tersedia di context/ jika ada url tuliskan Nama dan URL nya]
 
 📝 Catatan:
 [opsional — misalnya yoy, harga konstan, provisional]
