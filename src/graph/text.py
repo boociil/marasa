@@ -1,5 +1,5 @@
-menu_bps = """Halo 👋
-Selamat datang di layanan Badan Pusat Statistik Provinsi Sulawesi Barat
+menu_bps = """Halo {nama}👋
+Selamat datang di layanan virtual *Marasa by BPS Sulbar*
 
 Untuk membantu kebutuhan Anda, silakan pilih jenis layanan berikut dengan membalas *angka menu*:
 
@@ -25,6 +25,10 @@ Email :
 Tahun Lahir : 
 Pekerjaan : 
 Instansi/Tempat Aktivitas Sehari-hari : """
+
+Kalimat_Pembuka = """Hai {nama}👋
+Selamat datang di layanan virtual *Marasa by BPS Sulbar* 
+Sebelum mulai, mohon isi form identitas dulu ya untuk dokumentasi kami 😊"""
 
 
 LLM_PROMPT = """

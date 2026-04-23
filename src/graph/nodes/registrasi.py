@@ -1,6 +1,6 @@
 from src.graph.db.models import User, get_user_by_phone
 import re
-from src.graph.text import Form_Identitas
+from src.graph.text import Form_Identitas, Kalimat_Pembuka
 
 FORM_PATTERNS = {
     "nama_lengkap": r"nama\s*lengkap\s*:\s*(.+)",
@@ -33,7 +33,7 @@ def registrasi(state):
         
         if not check_iden : 
             state["answer"] = [
-                "Mohon mengisi form identitas untuk dokumentasi kami",
+                Kalimat_Pembuka.format(nama = state['nama']),
                 Form_Identitas
             ]
             state['is_done'] = True
