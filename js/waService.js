@@ -87,9 +87,9 @@ async function connectToWhatsApp() {
       const sendMessage = (jid, teks) => waSocket.sendMessage(jid, { text: teks });
 
       async function repeat_timer(jid_local, isfromMe_local){
-        if(isfromMe_local){
-          return
-        }
+        // if(isfromMe_local){
+        //   return
+        // }
         const allMessages = messageBuffer.get(jid_local)
 
         try {
