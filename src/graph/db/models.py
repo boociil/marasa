@@ -10,6 +10,7 @@ class User(BaseModel):
     nama_lengkap = CharField(max_length=255, null=True)
     pekerjaan = CharField(max_length=255, null=True)
     instansi = CharField(max_length=255, null=True)
+    tahun_lahir = IntegerField()
     created_at = DateTimeField(default=datetime.datetime.now)
 
 class ChatSession(BaseModel):
@@ -30,7 +31,7 @@ class ChatSession(BaseModel):
 
 class ChatMessage(BaseModel):
     session = ForeignKeyField(ChatSession, backref="messages")
-    role = CharField(max_length=10)   # user / bot
+    role = CharField(max_length=10)   # user / bot / sis
     content = TextField()
     created_at = DateTimeField(default=datetime.datetime.now)
 

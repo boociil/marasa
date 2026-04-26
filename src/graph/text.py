@@ -6,16 +6,13 @@ Untuk membantu kebutuhan Anda, silakan pilih jenis layanan berikut dengan membal
 1️⃣ Konsultasi Statistik
 Layanan permintaan data atau konsultasi terkait data statistik BPS.
 
-2️⃣ Pengaduan Terkait Layanan
-Sampaikan keluhan atau kendala terhadap pelayanan BPS.
+2️⃣ Pengaduan
+Sampaikan keluhan atau kendala terhadap BPS.
 
-3️⃣ Pengaduan Lainnya
-Pengaduan di luar layanan statistik BPS.
-
-4️⃣ Chat AI Statistik 🤖
+3️⃣ Chat AI Statistik 🤖
 Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS.
 
-5️⃣ Lainnya
+4️⃣ Lainnya
 Kebutuhan lain yang belum termasuk menu di atas.
 
 Silakan ketik *angka pilihan Anda* 😊"""

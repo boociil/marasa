@@ -13,25 +13,25 @@ connectToWhatsApp()
 // endpoint kirim pesan
 app.post("/send-message", upload.single("image"), async (req, res) => {
     try {
+        console.log(req.file)
         const { jid, text } = req.body
+
 
         if (!jid || !text)
             return res.status(400).json({ error: "jid & answers required" })
 
         const sock = getSocket()
 
-        const file = req.image
-        let payload
-
+        const file = req.file;
+        
         // jika ada file image upload
         if (file) {
             payload = {
                 image: file.buffer, // <- buffer dari multer
-                mimetype: file.mimetype,
                 caption: text || ""
             }
-        }else if (message) {
-            payload = { text: message }
+        }else {
+            payload = { text: text }
         }
         
 

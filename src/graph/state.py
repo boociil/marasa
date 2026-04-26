@@ -13,7 +13,7 @@ class RagPublikasiBRS(BaseModel):
     score: float
     def print(self):
         return f"""ID Pengetahuan :  {self.id}
-Julu : {self.title}
+Judul : {self.title}
 content : {self.content}
 Release : {self.rl_date}
 """
@@ -26,7 +26,7 @@ class RagData(BaseModel):
     score: float
     def print(self):
         return f"""ID Pengetahuan :  {self.id}
-Julu : {self.judul}
+Judul : {self.judul}
 content : {self.content}
 Url : {self.url}
 """
@@ -63,6 +63,7 @@ class BPSState(TypedDict):
     # rag
     use_ai: bool
     question: List[QuestionModel]
+    sis_answer: List[str]
    
     # outputs
     new_chat: List[str]

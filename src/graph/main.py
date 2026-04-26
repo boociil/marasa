@@ -8,9 +8,11 @@ from src.graph.nodes.complaint import create_ticket
 from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
 from src.graph.nodes.konsultasi import konsultasi
+from src.graph.state import AnswerModel
 
 from src.graph.db.models import ChatSession, ChatMessage
 
+ai_disclaimen = "*AI dapat membuat kesalahan"
 
 
 def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
@@ -24,10 +26,13 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
 
         "jid": jid,
         "nama": name,
+        "nama_lengkap": name,
         "notelp": phoneNumber,
+        "user_is_db": False,
 
         "use_ai": False,
         "question": [],
+        "sis_answer": [],
 
         "new_chat": text,
         "chat_history": [],
@@ -75,13 +80,13 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
                 case 2 :
                     return "create_ticket"
                 case 3 :
-                    return "create_ticket"
-                case 4 :
                     return "pecah_question_and_transform_untuk_rag"
-                case 5 :
+                case 4 :
                     return "konsultasi"
+                case _:  # Default case
+                    return END
         else :
-            END
+            return END
 
 
     builder.add_conditional_edges("human_node", followup_human_node)
@@ -97,22 +102,39 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
     graph = builder.compile()
     result = graph.invoke(state)
 
-
+    # print(result)
+    
     try:
         session = ChatSession.get_by_id(result['session_id'])
-        if not result['is_system'] :
-            for item_text in result["new_chat"] :
-                ChatMessage.create(
-                    session = session,
-                    role = "user",
-                    content = item_text,
-                )
-            for item_text in result["answer"] :
-                ChatMessage.create(
-                    session = session,
-                    role = "bot",
-                    content = item_text,
-                )
+        if session.is_done and result['user_is_db']: 
+            return []
+
+        for item_text in result["new_chat"] :
+            ChatMessage.create(
+                session = session,
+                role = "user",
+                content = item_text,
+            )
+        for item_text in result["sis_answer"] :
+            ChatMessage.create(
+                session = session,
+                role = "sis",
+                content = item_text,
+            )
+        for item_ques in result['question']:
+            for item_answer in item_ques.answer:
+                if item_answer.file_path is None :
+                    ChatMessage.create(
+                        session = session,
+                        role = "sis",
+                        content = item_answer.text,
+                    )
+                else :
+                    ChatMessage.create(
+                        session = session,
+                        role = "sis",
+                        content = item_answer.file_path,
+                    )
         session.use_ai = result['use_ai']
         session.is_done = result['session_done']
         session.need_human = result['need_human']
@@ -123,9 +145,14 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
         print()
 
     answer = []
+    for item_sis in result['sis_answer']:
+        answer.append(AnswerModel(type="text", text=item_sis))
     for item_ques in result['question']:
         for item_answer in item_ques.answer:
             answer.append(item_answer)
+
+    if len(result['question']) > 0 :
+        answer.append(AnswerModel(type="text", text=ai_disclaimen))
     
     return jid, answer
 

@@ -10,20 +10,25 @@ def set_layanan(state):
     if state["layanan_type"] == 0:
         number = 0
         for item in state['new_chat']:
-            if item in ['1','2','3','4','5'] :
+            if item in ['1','2','3','4'] :
                 number = int(item)
         session.layanan = number
         session.save()
 
         if number != 0 :
             state['layanan_type'] = number
-            state["answer"] = ["Apa yang bisa kami bantu hari ini?"]
             state['is_done'] = True
-            state["is_system"] = True  
+            if number == 1 :
+                state["sis_answer"].extend([f"Mohon tunggu sebentar kak *{state['nama_lengkap']}* ⏳. Saya teruskan pesan ini ke petugas kami agar segera dibantu. 😊"])
+            elif number == 2 :
+                state["sis_answer"].extend([f"Mohon maaf atas ketidaknyamanannya Bapak/Ibu *{state['nama_lengkap']}* 🙏🏻. Silakan sampaikan pengaduan Anda."])
+            elif number == 3 :
+                state["sis_answer"].extend(["Halo 👋 Saya asisten virtual yang siap membantu Anda. Silakan sampaikan kebutuhan atau pertanyaan Anda."])
+            elif number == 4 :
+                state["sis_answer"].extend([f"Mohon tunggu sebentar kak *{state['nama_lengkap']}* ⏳. Saya teruskan pesan ini ke petugas kami agar segera dibantu. 😊"])
         else :
-            state["answer"] = [menu_bps]
+            state["sis_answer"].extend([menu_bps])
             state['is_done'] = True
-            state["is_system"] = True
     
         
         if state['layanan_type'] == 4 :

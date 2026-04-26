@@ -11,8 +11,6 @@ from google.genai.types import Tool, GenerateContentConfig
 
 load_dotenv(find_dotenv()) 
 
-ai_disclaimen = "*AI dapat membuat kesalahan"
-
 def pecah_question_and_transform_untuk_rag(state) :
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
 
@@ -238,7 +236,7 @@ def rag_answer(state):
 
         if len(state["question"][index].rag_publikasi_brs_output) > 0 :
             for i, item in enumerate(state["question"][index].rag_publikasi_brs_output) :
-                state["question"][index].answer.append(AnswerModel(type="file", file_path= findImagePathPublikasiBRS(item)))
+                state["question"][index].answer.append(AnswerModel(type="file", text=f"{item.title}, Hal {item.halaman}", file_path= findImagePathPublikasiBRS(item)))
 
 
         prompt = LLM_PROMPT.format(

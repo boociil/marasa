@@ -29,9 +29,9 @@ def llm_query(prompt: str, api_key_s, config) :
             else:
                 print(response)
                 attmpt += 1
-                time.sleep((attmpt*2)+3)
+                time.sleep((attmpt*3)+3)
         except Exception as e:
             print(e)
             attmpt += 1
-            time.sleep((attmpt*2)+3)
+            time.sleep((attmpt*3)+3)
        

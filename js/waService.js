@@ -122,7 +122,7 @@ async function connectToWhatsApp() {
 
             const jid = msg.key.remoteJid.startsWith("62") ? msg.key.remoteJid :  msg.key.remoteJidAlt
             if (!jid) return
-            if (jid.endsWith("@g.us")) return
+            // if (jid.endsWith("@g.us")) return
             if (msg.message.protocolMessage) return;
 
             const decode = jidDecode(jid);
