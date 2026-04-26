@@ -5,6 +5,8 @@ from src.graph.state import QuestionModel, RagPublikasiBRS, RagData, AnswerModel
 from dotenv import load_dotenv, find_dotenv
 import os
 import uuid
+import json
+import unicodedata
 from google.genai.types import Tool, GenerateContentConfig
 
 load_dotenv(find_dotenv()) 
@@ -24,6 +26,7 @@ Tujuan:
 Ekstrak semua pertanyaan dari teks dan kembalikan dalam bentuk array JSON yang rapi.
 
 Aturan ketat:
+- Pertanyaan bisa tampa tanda ? / tanya
 - Tanpa penjelasan.
 - Tidak boleh ada teks tambahan.
 - Pertahankan bahasa asli.
@@ -32,16 +35,15 @@ Aturan ketat:
 - perhatikan Riwayat percakapan namun kalo tidak relevan hilangkan
 
 Riwayat percakapan:
-{history}
+{history if history.strip() != "" else "-"}
 
 Teks yang akan dianalisis:
 {new_chat}
 """
 
-    pecah_question_hasil = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
+    pecah_question_hasil = llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'),config={
         "response_mime_type": "application/json",
         "response_json_schema":  {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "array",
             "items": {
                 "type": "string"
@@ -50,11 +52,10 @@ Teks yang akan dianalisis:
     })
 
     ques_arr = []
-    for item in pecah_question_hasil :
+    for item in json.loads(pecah_question_hasil ):
         ques_arr.append(QuestionModel(ques=item))
     state["question"] = ques_arr
-   
-    print(pecah_question_hasil)
+
     return state
 
 def transform_untuk_rag(state) :
@@ -74,6 +75,7 @@ Aturan:
 - Hapus kata-kata percakapan
 - JANGAN menjawab pertanyaan
 - Jumlah hasil harus sama dengan jumlah pertanyaan
+- Jangan memperbanyak pertanyaan
 
 Contoh:
 Pertanyaan: “Apa roadmap AI?”
@@ -85,7 +87,6 @@ Beberapa Pertanyaan:
     extract_rag = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
         "response_mime_type": "application/json",
         "response_json_schema":  {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "array",
             "items": {
                 "type": "string"
@@ -93,10 +94,9 @@ Beberapa Pertanyaan:
         },
     })
 
-    for index, item in enumerate(extract_rag): 
+    extract_rag = json.loads(extract_rag)
+    for index, item in enumerate(extract_rag):         
         state["question"][index].rag_ques = extract_rag[index]
-     
-    print(extract_rag)
     return state
 
 
@@ -106,13 +106,24 @@ def rag_search(state):
 
         docs_pdf = get_rag_data(query)
         for doc, _score in docs_pdf:
+            bps_id = ""
+            type = ""
+            if 'pub_id' in doc.metadata : 
+                bps_id = doc.metadata['pub_id']
+                type = 'pub'
+            if 'brs_id' in doc.metadata : 
+                bps_id = doc.metadata['brs_id']
+                type = 'brs'
+            
             state["question"][index].rag_publikasi_brs.append(
                 RagPublikasiBRS( 
-                    id = uuid.uuid4(),
-                    title = doc.metadata.title, 
-                    halaman= doc.metadata.id.split(':')[-1], 
+                    id = str(uuid.uuid4()),
+                    bps_id = bps_id,
+                    type = type,
+                    title = doc.metadata['title'], 
+                    halaman= int(doc.id.split(':')[-2])+1, 
                     content = doc.page_content, 
-                    rl_date = doc.metadata.rl_date, 
+                    rl_date = doc.metadata['rl_date'], 
                     score= _score
                 )
             )
@@ -121,11 +132,10 @@ def rag_search(state):
         for doc, _score in docs_table:
             state["question"][index].rag_data.append(
                 RagData( 
-                    id = uuid.uuid4(),
-                    judul = doc.metadata.judul, 
+                    id = str(uuid.uuid4()),
+                    judul = doc.metadata['judul'], 
                     url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
                     content = doc.page_content, 
-                    rl_date = doc.metadata.rl_date, 
                     score= _score
                 )
             )
@@ -134,11 +144,12 @@ def rag_search(state):
 def rag_validate(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
+        print('ques')
         chunks = ""
 
-        for item in state["question"][index]['rag_publikasi_brs'] :
+        for item in state["question"][index].rag_publikasi_brs :
             chunks += item.print() +'\n\n'
-        for item in state["question"][index]['rag_data'] :
+        for item in state["question"][index].rag_data :
             chunks += item.print() +'\n\n'
 
         prompt =f""""
@@ -155,6 +166,7 @@ Aturan ketat:
 - JANGAN menjawab pertanyaan.
 - Output HARUS JSON saja, tanpa penjelasan.
 - OUTPUT CUKUP Array dari id pengetahuan
+- Urutkan dari yang paling relevan
 
 Pertanyaan:
 {ques}
@@ -162,10 +174,10 @@ Pertanyaan:
 Daftar knowledge chunks:
 {chunks}"""
         
-        id_keep_rag = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
+        print(prompt)
+        id_keep_rag = llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
             "response_mime_type": "application/json",
             "response_json_schema":  {
-                "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "array",
                 "items": {
                     "type": "string"
@@ -173,12 +185,16 @@ Daftar knowledge chunks:
             },
         })
 
-        for item in state["question"][index]['rag_publikasi_brs'] :
+        id_keep_rag = json.loads(id_keep_rag)
+
+        for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag :
                 state["question"][index].rag_publikasi_brs_output.append(
                     RagPublikasiBRS( 
                         id = item.id,
-                        title = item.title,
+                        bps_id = item.bps_id,
+                        type = item.type,
+                        title = item.title, 
                         halaman= item.halaman,
                         content = item.content,
                         rl_date = item.rl_date,
@@ -186,7 +202,7 @@ Daftar knowledge chunks:
                     )
                 )
         
-        for item in state["question"][index]['rag_data'] :
+        for item in state["question"][index].rag_data :
             if item.id in id_keep_rag :
                 state["question"][index].rag_data_output.append(
                     RagData( 
@@ -194,7 +210,6 @@ Daftar knowledge chunks:
                         judul = item.judul,
                         url= item.url,
                         content = item.content,
-                        rl_date = item.rl_date,
                         score= item.score,
                     )
                 )
@@ -206,19 +221,19 @@ def rag_answer(state):
         ques = state["question"][index].ques
         chunks = ""
 
-        for item in state["question"][index]['rag_publikasi_brs_output'] :
+        for item in state["question"][index].rag_publikasi_brs_output :
             chunks += item.print() +'\n\n'
-        for item in state["question"][index]['rag_data_output'] :
+        for item in state["question"][index].rag_data_output :
             chunks += item.print() +'\n\n'
 
-        if len(state["question"][index]['rag_publikasi_brs_output']) + len(state["question"][index]['rag_data_output']) == 0:
+        if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
             state["question"][index].answer.append(AnswerModel(type="text", text="Maaf, kami belum menemukan data yang sesuai."))
             continue
         
         
 
-        if len(state["question"][index]['rag_publikasi_brs_output']) > 0 :
-            for i, item in enumerate(state["question"][index]['rag_publikasi_brs_output']) :
+        if len(state["question"][index].rag_publikasi_brs_output) > 0 :
+            for i, item in enumerate(state["question"][index].rag_publikasi_brs_output) :
                 state["question"][index].answer.append(AnswerModel(type="file", file_path= findImagePathPublikasiBRS(item)))
 
 
@@ -226,7 +241,7 @@ def rag_answer(state):
             context=chunks,
             question=ques
         )
-        hasil = llm_query(prompt,  os.getenv('Whatsapp7600_03_Api_KEY'), config=GenerateContentConfig(
+        hasil = llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'), config=GenerateContentConfig(
             tools=[
                 {"url_context": {}},
             ],
@@ -236,15 +251,15 @@ def rag_answer(state):
     return state
 
 def findImagePathPublikasiBRS(item: RagPublikasiBRS):
-    if item.brs_id is not None: #publikas
-        title = secure_filename(item.rl_date+'-'+str(item['title']))
+    if item.type == 'pub': #publikas
+        title = secure_filename(item.rl_date+'-'+str(item.title))
         path_folder = os.path.join(os.getenv("IMAGES_FOLDER_Publikasi"), title.replace("/", "-"))
-        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg'), 'JPEG'
+        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg')
         return path_image
-    if item.brs_id is None:
-        title = secure_filename(item.rl_date+'-'+str(item['brs_id']))
+    if item.type == 'brs':
+        title = secure_filename(item.rl_date+'-'+str(item.bps_id))
         path_folder = os.path.join(os.getenv("IMAGES_FOLDER_BRS"), title.replace("/", "-"))
-        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg'), 'JPEG'
+        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg')
         return path_image
 
 INVALID_FILE_CHARS = '/\\?%*:|"<>' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words

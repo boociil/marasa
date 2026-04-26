@@ -131,3 +131,51 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
     
     return jid, answer
 
+
+def main_chat_cmd(text: list[str], chat_history: list[str]): 
+
+    state = {
+        "session_id": None,
+        "session_done": False,
+        "layanan_type": 0,
+        "need_human": False,
+        "is_done": False,
+
+        "jid": "jid",
+        "nama": "name",
+        "notelp": "notelp",
+
+        "use_ai": False,
+        "question": [],
+
+        "new_chat": text,
+        "chat_history": [],
+    }
+
+    builder = StateGraph(BPSState)
+    # nodes
+
+
+    builder.add_node("pecah_question", pecah_question)
+    builder.add_node("transform_untuk_rag", transform_untuk_rag)
+    builder.add_node("rag_search", rag_search)
+    builder.add_node("rag_validate", rag_validate)
+    builder.add_node("rag_answer", rag_answer)
+    
+
+    builder.add_edge(START, "pecah_question")
+    builder.add_edge("pecah_question", "transform_untuk_rag")
+    builder.add_edge("transform_untuk_rag", "rag_search")
+    builder.add_edge("rag_search", "rag_validate")
+    builder.add_edge("rag_validate", "rag_answer")
+    builder.add_edge("rag_answer", END)
+
+    graph = builder.compile()
+    result = graph.invoke(state)
+
+    answer = []
+    for item_ques in result['question']:
+        for item_answer in item_ques.answer:
+            answer.append(item_answer)
+    
+    return answer

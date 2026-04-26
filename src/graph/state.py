@@ -4,7 +4,8 @@ from typing import Optional
 
 class RagPublikasiBRS(BaseModel):
     id: str
-    brs_id: Optional[str]
+    type: str
+    bps_id: str
     title: str 
     halaman: int
     content: str
@@ -22,24 +23,22 @@ class RagData(BaseModel):
     judul: str 
     url: str
     content: str
-    rl_date: str
     score: float
     def print(self):
         return f"""ID Pengetahuan :  {self.id}
 Julu : {self.judul}
 content : {self.content}
-Release : {self.rl_date}
 Url : {self.url}
 """
 
 class AnswerModel(BaseModel):
     type: str #file, text, system
-    file_path: Optional[str] 
-    text: Optional[str] 
+    file_path: Optional[str] = None
+    text: Optional[str] = None
 
 class QuestionModel(BaseModel):
-    ques: str
-    rag_ques: str
+    ques: Optional[str] = None
+    rag_ques: Optional[str] = None
     answer: list[AnswerModel] = []
     rag_publikasi_brs: list[RagPublikasiBRS] = []
     rag_data: list[RagData] = []
@@ -47,8 +46,8 @@ class QuestionModel(BaseModel):
     rag_data_output: list[RagData] = []
 
 class ChatMessage(BaseModel):
-    role = str
-    content = str
+    role: str
+    content: str
 
 class BPSState(TypedDict):
     session_id: Optional[str]

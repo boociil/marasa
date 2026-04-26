@@ -18,17 +18,20 @@ load_dotenv(find_dotenv())
 def llm_query(prompt: str, api_key_s, config) :
     client = genai.Client(api_key=api_key_s)
 
+    attmpt = 1
     while True:
         try:
             response = client.models.generate_content(
                 model="gemini-3.1-flash-lite-preview", contents=prompt, config=config
             )
             if response and response.text:
-                print(response.text)
                 return response.text
             else:
-                time.sleep(3)
+                print(response)
+                attmpt += 1
+                time.sleep((attmpt*2)+3)
         except Exception as e:
             print(e)
-            time.sleep(3)
+            attmpt += 1
+            time.sleep((attmpt*2)+3)
        
