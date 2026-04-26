@@ -7,26 +7,41 @@ import asyncio
 import requests
 from dotenv import load_dotenv
 import os
+from peewee import fn
+from src.graph.db.models import User, ChatSession, ChatMessage, get_user_by_phone
+from datetime import datetime, timedelta
+from fastapi_utils.tasks import repeat_every
 
 load_dotenv()
 
+app = FastAPI()
 
-# Define the task to run every minute
-async def every_minute_task():
-    while True:
-       
-        # Perform your logic here
-        await asyncio.sleep(60) # Sleep for 60 seconds
+@app.on_event("startup")
+@repeat_every(seconds=60)
+def iddle_task():
+    print("asasasasasas")
+    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
+    idle_sessions = (
+        ChatSession
+        .select(
+            ChatSession,
+            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
+        )
+        .where(
+            (ChatSession.layanan == 3) &
+            (ChatSession.is_done == False)
+        )
+        .join(ChatMessage)
+        .group_by(ChatSession)
+        .having(fn.MAX(ChatMessage.created_at) < ten_minutes_ago)
+    )
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Start the background task
-    task = asyncio.create_task(every_minute_task())
-    yield
-    # Cancel the task on shutdown
-    task.cancel()
+    for item in idle_sessions :
+        user = get_user_by_phone(item.phone)
+        item.is_done = True
+        item.save()
+        requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': user.jid, 'text': 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊'})
 
-app = FastAPI(lifespan=lifespan)
 
 class Param(BaseModel):
    jid: str

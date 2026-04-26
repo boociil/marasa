@@ -162,6 +162,7 @@ Aturan ketat:
 - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
 - Hapus chunk yang hanya sedikit berkaitan.
 - Hapus chunk yang tidak membantu menjawab pertanyaan.
+- Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
 - Jika tidak ada yang relevan, kembalikan list kosong.
 - JANGAN menjawab pertanyaan.
 - Output HARUS JSON saja, tanpa penjelasan.

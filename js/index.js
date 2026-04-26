@@ -13,7 +13,6 @@ connectToWhatsApp()
 // endpoint kirim pesan
 app.post("/send-message", upload.single("image"), async (req, res) => {
     try {
-        console.log(req.file)
         const { jid, text } = req.body
 
 

@@ -59,6 +59,7 @@ class BPSState(TypedDict):
     jid: str
     nama: str
     notelp: str
+    nama_lengkap: str
     
     # rag
     use_ai: bool
