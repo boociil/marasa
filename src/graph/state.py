@@ -38,7 +38,7 @@ class AnswerModel(BaseModel):
 
 class QuestionModel(BaseModel):
     ques: Optional[str] = None
-    rag_ques: Optional[str] = None
+    rag_ques: list[str] = []
     answer: list[AnswerModel] = []
     rag_publikasi_brs: list[RagPublikasiBRS] = []
     rag_data: list[RagData] = []

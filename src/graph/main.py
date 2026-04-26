@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, START, END
 from src.graph.state import BPSState
 from src.graph.nodes.registrasi import registrasi
 from src.graph.nodes.set_layanan import set_layanan
-from src.graph.nodes.rag import pecah_question, transform_untuk_rag, rag_search, rag_validate, rag_answer
+from src.graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
 from src.graph.nodes.complaint import create_ticket
 from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
@@ -43,8 +43,7 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
     builder.add_node("konsultasi", konsultasi)
     builder.add_node("create_ticket", create_ticket)
 
-    builder.add_node("pecah_question", pecah_question)
-    builder.add_node("transform_untuk_rag", transform_untuk_rag)
+    builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
     builder.add_node("rag_validate", rag_validate)
     builder.add_node("rag_answer", rag_answer)
@@ -78,7 +77,7 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
                 case 3 :
                     return "create_ticket"
                 case 4 :
-                    return "pecah_question"
+                    return "pecah_question_and_transform_untuk_rag"
                 case 5 :
                     return "konsultasi"
         else :
@@ -90,8 +89,7 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
     builder.add_edge("konsultasi", END)
     builder.add_edge("create_ticket", END)
 
-    builder.add_edge("pecah_question", "transform_untuk_rag")
-    builder.add_edge("transform_untuk_rag", "rag_search")
+    builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
     builder.add_edge("rag_search", "rag_validate")
     builder.add_edge("rag_validate", "rag_answer")
     builder.add_edge("rag_answer", END)
@@ -155,17 +153,14 @@ def main_chat_cmd(text: list[str], chat_history: list[str]):
     builder = StateGraph(BPSState)
     # nodes
 
-
-    builder.add_node("pecah_question", pecah_question)
-    builder.add_node("transform_untuk_rag", transform_untuk_rag)
+    builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
     builder.add_node("rag_validate", rag_validate)
     builder.add_node("rag_answer", rag_answer)
     
 
-    builder.add_edge(START, "pecah_question")
-    builder.add_edge("pecah_question", "transform_untuk_rag")
-    builder.add_edge("transform_untuk_rag", "rag_search")
+    builder.add_edge(START, "pecah_question_and_transform_untuk_rag")
+    builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
     builder.add_edge("rag_search", "rag_validate")
     builder.add_edge("rag_validate", "rag_answer")
     builder.add_edge("rag_answer", END)

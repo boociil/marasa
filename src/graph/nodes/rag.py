@@ -1,4 +1,4 @@
-from src.graph.rag.retriever import get_rag_data, get_rag_data_table
+from src.graph.rag.retriever import get_rag_data, get_rag_data_arr, get_rag_data_table, get_rag_data_table_arr
 from src.graph.text import LLM_PROMPT
 from src.graph.llm import llm_query
 from src.graph.state import QuestionModel, RagPublikasiBRS, RagData, AnswerModel
@@ -13,65 +13,31 @@ load_dotenv(find_dotenv())
 
 ai_disclaimen = "*AI dapat membuat kesalahan"
 
-def pecah_question(state) :
-      # print("rag_rewrite_query")
+def pecah_question_and_transform_untuk_rag(state) :
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
 
     new_chat = "\n".join(state["new_chat"])
 
     prompt = f"""
-Anda adalah alat ekstraktor pertanyaan.
+Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
 
-Tujuan:
-Ekstrak semua pertanyaan dari teks dan kembalikan dalam bentuk array JSON yang rapi.
+Tujuan Anda:
+Analisis teks yang diberikan (mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan beberapa variasi kueri pencarian yang dioptimalkan untuk masing-masing pertanyaan tersebut guna memaksimalkan relevansi dokumen (seperti publikasi, tabel statis, atau metadata) yang akan ditarik.
 
-Aturan ketat:
-- Jangan kehilangan konteks utama
+Aturan Ekstraksi Pertanyaan:
+- Jangan kehilangan konteks utama pertanyaan
 - Pertanyaan bisa tampa tanda ? / tanya
-- Tanpa penjelasan, kecual jika sebagai konteks utama.
+- Tanpa penjelasan, kecual jika sebagai konteks utama pertanyaan.
 - Tidak boleh ada teks tambahan.
 - Pertahankan bahasa asli.
 - Hapus duplikat.
 - Jika beberapa pertanyaan dapat digabung, maka gabung
-- Jika tidak ada pertanyaan, kembalikan: []
 - perhatikan Riwayat percakapan namun kalo tidak relevan hilangkan
 
-Riwayat percakapan:
-{history if history.strip() != "" else "-"}
 
-Teks yang akan dianalisis:
-{new_chat}
-"""
-
-    pecah_question_hasil = llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'),config={
-        "response_mime_type": "application/json",
-        "response_json_schema":  {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-    })
-
-    print(json.loads(pecah_question_hasil ))
-    ques_arr = []
-    for item in json.loads(pecah_question_hasil ):
-        ques_arr.append(QuestionModel(ques=item))
-    state["question"] = ques_arr
-
-    return state
-
-def transform_untuk_rag(state) :
-    question_str_arr = []
-    for item in state["question"] :
-        question_str_arr.append(item.ques)
-
-    prompt = f"""
-Anda adalah pengoptimal kueri pencarian untuk pengambilan data RAG.
-
-Ubah setiap pertanyaan menjadi kueri pencarian terperinci yang akan mengambil dokumen-dokumen paling relevan.
-
-Aturan:
+Aturan Optimasi Kueri Pencarian RAG:
+- Buat minimal 1  kueri pencarian yang mandiri (standalone) untuk setiap pertanyaan yang diekstrak
+- lebih dari kuari pencarian jika ada beberapa indikator yang dicari (misalnya hubunggan variabel a dan b, maka masing-masing a dan b)
 - Pertahankan bahasa asli
 - Jangan kehilangan konteks utama
 - Perluas konteks dan kata kunci
@@ -83,35 +49,64 @@ Aturan:
 - Jika menayakan data dan tidak ada konteks wilayah tambahkan sulawesi barat
 - Jika menayakan data dan tidak ada konteks waktu maka tambahkan waktu terbaru (2025, 2026)
 
-Contoh:
-Pertanyaan: “Apa roadmap AI?”
-Kueri: “roadmap belajar kecerdasan buatan untuk pemula, keterampilan machine learning, Python, matematika, langkah demi langkah”
+Aturan Output (SANGAT KETAT):
+- Anda HANYA boleh merespons dalam format array JSON yang valid.
+- Tidak boleh ada teks tambahan, penjelasan, atau blok *markdown* di luar JSON.
+- Jika tidak ada pertanyaan yang ditemukan sama sekali dalam teks, kembalikan array kosong: []
 
-Beberapa Pertanyaan:
-{question_str_arr}
+Format JSON yang diharapkan:
+[
+  {{
+    "pertanyaan_asli": "Teks pertanyaan yang telah dirapikan",
+    "kueri_pencarian": [
+      "variasi kueri kata kunci panjang 1",
+      "variasi kueri kata kunci panjang 2 beserta wilayah dan tahun jika data",
+      "variasi kueri kata kunci spesifik 3"
+    ]
+  }}
+]
+
+=== INPUT ===
+Riwayat Percakapan:
+{history if history.strip() != "" else "-"}
+
+Teks Pengguna:
+{new_chat}
 """
     extract_rag = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
         "response_mime_type": "application/json",
         "response_json_schema":  {
             "type": "array",
             "items": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                    "pertanyaan_asli": {
+                        "type": "string",
+                    },
+                    "kueri_pencarian": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                    }
+                },
             }
         },
     })
 
     extract_rag = json.loads(extract_rag)
     print(extract_rag)
-    for index, item in enumerate(extract_rag):         
-        state["question"][index].rag_ques = extract_rag[index]
+    ques_arr = []
+    for item in extract_rag:
+        ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=item['kueri_pencarian']))
+    state["question"] = ques_arr
     return state
-
 
 def rag_search(state):
     for index, item in enumerate(state['question']) :
         query = state["question"][index].rag_ques
 
-        docs_pdf = get_rag_data(query)
+        docs_pdf = get_rag_data_arr(query, 5)
         for doc, _score in docs_pdf:
             bps_id = ""
             type = ""
@@ -135,7 +130,7 @@ def rag_search(state):
                 )
             )
 
-        docs_table = get_rag_data_table(query)
+        docs_table = get_rag_data_table_arr(query, 5)
         for doc, _score in docs_table:
             state["question"][index].rag_data.append(
                 RagData( 
