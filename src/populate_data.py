@@ -20,6 +20,7 @@ def get_categories():
     while True: 
         try:
             response = requests.get(url).json()
+            # print(response)
             if response['status'] == 'OK':
                 return response['data'][1]
         except Exception as e:
@@ -35,6 +36,7 @@ def get_subjects(subcat, page ):
     while True: 
         try:
             response = requests.get(url).json()
+            # print(response)
             if response['status'] == 'OK':
                 return response['data'][1], response['data'][0]['pages']
         except Exception as e:
@@ -48,6 +50,7 @@ def get_table(subject, page):
     while True: 
         try:
             response = requests.get(url).json()
+            # print(response)
             if response['data-availability'] == 'list-not-available' :
                 return [], None
             if response['status'] == 'OK' and response['data-availability'] != 'list-not-available':
@@ -61,10 +64,11 @@ def get_detail_table(id , type = 0, year_arr = []):
     if len(year_arr) == 0 :
         """Mengambil semua subjek (CSA) yang tersedia"""
         url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
-        print(url)
+        # print(url)
         while True: 
             try:
                 response = requests.get(url).json()
+                # print(response)
                 if response['status'] == 'OK':
                     return [response]
                 elif response['status'] == 'Error':
@@ -75,38 +79,59 @@ def get_detail_table(id , type = 0, year_arr = []):
             
     elif type == 2:
         response_arr = []
-        index = 0
-        for item_year in year_arr:
-            """Mengambil semua subjek (CSA) yang tersedia"""
-            url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/year/{item_year}/lang/ind/id/{id}/key/{API_KEY}/"
-            print(url)
-            while True: 
-                try:
-                    response = requests.get(url).json()
-                    if response['status'] == 'OK':
-                        response_arr.append(response)
-                        break
-                    elif response['status'] == 'Error':
-                        print(response)
-                        break
-                except Exception as e:
-                    print(e)
-               
+        url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
+        vars_arr = []
+        while True: 
+            try:
+                response = requests.get(url).json()
+                # print(response)
+                if response['status'] == 'OK':
+                    vars_arr = response['var']
+                    break
+                elif response['status'] == 'Error':
+                    print(response)
+                    break
+            except Exception as e:
+                print(e)
 
-            if index == 0 and response is not None and response['status'] == 'OK':
-                if type ==2 :
-                    if "available_years" in response:
-                        for item_avail_year in  response['available_years']:
-                            if int(item_avail_year) not in year_arr :
-                                year_arr.append(int(item_avail_year))
+        for item_var in vars_arr :
+            page_1 = 1
+            pages_1 = 1 
+            tahun_arr = []
+            while page_1 <= pages_1: 
+                # https://webapi.bps.go.id/v1/api/list/model/th/lang/ind/domain/7600/var/491/page/1/key/70b9771878b76e68902b2aa1dffb2084/
+                url_ = f"{BASE_URL}/list/model/th/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/page/{page_1}/key/{API_KEY}/"
+                while True: 
+                    try:
+                        response = requests.get(url_).json()
+                        # print(response)
+                        if response['status'] == 'OK':
+                            tahun_arr.extend(response['data'][1])
+                            pages_1 = response['data'][0]['pages']
+                            break
+                        elif response['status'] == 'Error':
+                            print(response)
+                            break
+                    except Exception as e:
+                        print(e)
+                page_1 += 1
+            # print(tahun_arr)
+            for item_tahun in tahun_arr:
+                #https://webapi.bps.go.id/v1/api/list/model/data/lang/ind/domain/7600/var/491/th/109;110/key/70b9771878b76e68902b2aa1dffb2084/
+                url__ = f"{BASE_URL}/list/model/data/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/th/{item_tahun['th_id']}/page/{page_1}/key/{API_KEY}/"
+                while True: 
+                    try:
+                        response = requests.get(url__).json()
+                        # print(response)
+                        if response['status'] == 'OK':
+                            response_arr.append(response)
+                            break
+                        elif response['status'] == 'Error':
+                            print(response)
+                            break
+                    except Exception as e:
+                        print(e)
 
-                elif type ==3 :
-                    if "list_tahun_data" in response['data'][1]:
-                        for item_avail_year in  response['data'][1]['list_tahun_data']:
-                            if int(item_avail_year) not in year_arr :
-                                year_arr.append(int(item_avail_year))
-            index += 1
-        print(year_arr)
         return response_arr    
     elif type == 3:
         response_arr = []
@@ -114,10 +139,11 @@ def get_detail_table(id , type = 0, year_arr = []):
         for item_year in year_arr:
             """Mengambil semua subjek (CSA) yang tersedia"""
             url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/year/{item_year}/lang/ind/id/{id}/key/{API_KEY}/"
-            print(url)
+            # print(url)
             while True: 
                 try:
                     response = requests.get(url).json()
+                    # print(response)
                     if response['status'] == 'OK':
                         response_arr.append(response)
                         break
@@ -134,7 +160,6 @@ def get_detail_table(id , type = 0, year_arr = []):
                         if int(item_avail_year) not in year_arr :
                             year_arr.append(int(item_avail_year))
             index += 1
-        print(year_arr)
         return response_arr    
             
 def json_to_text_2(item_table, json_data: dict, kategori, subyek, id_, metadata_) -> str:
@@ -270,13 +295,6 @@ Kategori: {kategori}.
 Subyek: {subyek}.
 Cakupan waktu: {awal} sampai {akhir}.
 Jenis sumber: {sumber}."""
-    
-
-    ids=[]
-    documents=[]
-    metadatas=[]
-
-    mulai = False
 
     categories = get_categories()
     
@@ -287,6 +305,8 @@ Jenis sumber: {sumber}."""
         while page_1 <= pages_1: 
             subject_a, pages_1 = get_subjects(cate['subcat_id'], page_1)
             for subjec in subject_a:
+                ids=[]
+                documents=[]
                 print("subjec : "+subjec["title"])
                 page_2 = 1
                 pages_2 = 1 
@@ -295,13 +315,11 @@ Jenis sumber: {sumber}."""
                     if pages_2_ is not None :
                         pages_2 = pages_2_
                     for item in tables :
-                        if item['id'] != 'NDkxIzI=':
-                            continue
+                        # print(item["title"])
                         # if item['id'] == 'Mjk0IzI=':
                         #     mulai = True
                         # if not mulai:
                         #     continue
-                        time.sleep(1)
                         tablesource = ""
                         if item['tablesource'] == '1':
                             tablesource = "Static Table"
@@ -333,8 +351,6 @@ Jenis sumber: {sumber}."""
                                 continue
                             datas = get_detail_table(item['id'], 2, list(range(int(item["oldest_period"]), int(item["latest_period"])+1)))
                             for item_datas in datas:
-                                print(str(item_datas.get('tahun', [])[0]['label']))
-                                print()
                                 id_, page_content_, metadata_ = json_to_text_2(item, item_datas, cate["title"], subjec["title"], 
                                                                                 str(cate['subcat_id'])+'-'+str(subjec['sub_id'])+'-'+str(item['id']), 
                                                                                {
@@ -345,7 +361,7 @@ Jenis sumber: {sumber}."""
                                                                                     'table_id' : item['id'],
                                                                                     'sumber': item['tablesource']
                                                                                 })  
-                                print(id_)
+                                # print(id_)
                                 # print(page_content_)
                                 # print(metadata_)
                                 ids.append(id_)
@@ -365,22 +381,22 @@ Jenis sumber: {sumber}."""
                                                                                     'table_id' : item['id'],
                                                                                     'sumber': item['tablesource']
                                                                                 })  
-                                print(id_)
-                                print(page_content_)
-                                print(metadata_)
+                                # print(id_)
+                                # print(page_content_)
+                                # print(metadata_)
                                 ids.append(id_)
                                 documents.append(Document(page_content=page_content_, metadata=metadata_))
 
-                        break
+
+                       
                     page_2 += 1
-                    break
-
+                print(len(ids))
+                print(len(documents))
+                print(len(ids) == len(set(ids)))
+                if len(ids) > 0:
+                    db.add_documents(
+                        documents,
+                        ids=ids,
+                    )
             page_1 += 1
-
-
-    print(ids)
-    print(documents)
-    db.add_documents(
-        documents,
-        ids=ids,
-    )
+            time.sleep(3)
