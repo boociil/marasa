@@ -32,6 +32,7 @@ Aturan ketat:
 - Tidak boleh ada teks tambahan.
 - Pertahankan bahasa asli.
 - Hapus duplikat.
+- Jika beberapa pertanyaan dapat digabung, maka gabung
 - Jika tidak ada pertanyaan, kembalikan: []
 - perhatikan Riwayat percakapan namun kalo tidak relevan hilangkan
 
