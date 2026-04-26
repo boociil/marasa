@@ -51,6 +51,7 @@ Teks yang akan dianalisis:
         },
     })
 
+    print(json.loads(pecah_question_hasil ))
     ques_arr = []
     for item in json.loads(pecah_question_hasil ):
         ques_arr.append(QuestionModel(ques=item))
@@ -76,6 +77,8 @@ Aturan:
 - JANGAN menjawab pertanyaan
 - Jumlah hasil harus sama dengan jumlah pertanyaan
 - Jangan memperbanyak pertanyaan
+- Jika tidak ada konteks wilayah tambahkan sulawesi barat
+- Jika tidak ada konteks waktu maka tambahkan waktu terbaru (2025, 2026)
 
 Contoh:
 Pertanyaan: “Apa roadmap AI?”
@@ -95,6 +98,7 @@ Beberapa Pertanyaan:
     })
 
     extract_rag = json.loads(extract_rag)
+    print(extract_rag)
     for index, item in enumerate(extract_rag):         
         state["question"][index].rag_ques = extract_rag[index]
     return state
@@ -144,7 +148,7 @@ def rag_search(state):
 def rag_validate(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
-        print('ques')
+        # print('ques')
         chunks = ""
 
         for item in state["question"][index].rag_publikasi_brs :
@@ -174,7 +178,7 @@ Pertanyaan:
 Daftar knowledge chunks:
 {chunks}"""
         
-        print(prompt)
+        # print(prompt)
         id_keep_rag = llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
             "response_mime_type": "application/json",
             "response_json_schema":  {
@@ -184,6 +188,8 @@ Daftar knowledge chunks:
                 }
             },
         })
+
+        print(id_keep_rag)
 
         id_keep_rag = json.loads(id_keep_rag)
 
