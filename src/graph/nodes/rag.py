@@ -26,8 +26,9 @@ Tujuan:
 Ekstrak semua pertanyaan dari teks dan kembalikan dalam bentuk array JSON yang rapi.
 
 Aturan ketat:
+- Jangan kehilangan konteks utama
 - Pertanyaan bisa tampa tanda ? / tanya
-- Tanpa penjelasan.
+- Tanpa penjelasan, kecual jika sebagai konteks utama.
 - Tidak boleh ada teks tambahan.
 - Pertahankan bahasa asli.
 - Hapus duplikat.
@@ -71,14 +72,15 @@ Ubah setiap pertanyaan menjadi kueri pencarian terperinci yang akan mengambil do
 
 Aturan:
 - Pertahankan bahasa asli
+- Jangan kehilangan konteks utama
 - Perluas konteks dan kata kunci
 - Buat agar mandiri
 - Hapus kata-kata percakapan
 - JANGAN menjawab pertanyaan
 - Jumlah hasil harus sama dengan jumlah pertanyaan
 - Jangan memperbanyak pertanyaan
-- Jika tidak ada konteks wilayah tambahkan sulawesi barat
-- Jika tidak ada konteks waktu maka tambahkan waktu terbaru (2025, 2026)
+- Jika menayakan data dan tidak ada konteks wilayah tambahkan sulawesi barat
+- Jika menayakan data dan tidak ada konteks waktu maka tambahkan waktu terbaru (2025, 2026)
 
 Contoh:
 Pertanyaan: “Apa roadmap AI?”
