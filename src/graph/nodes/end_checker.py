@@ -17,8 +17,14 @@ Apakah user sudah puas dan ingin mengakhiri percakapan?
 biasanya berupa terima kasih dan tanpa ada pertanyaan tambahan
 Jawab hanya: YES atau NO
 """
+    hasil = "NO"
+    while True:
+        respomse_text = await llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'), {})
+        if respomse_text in ['YES', 'NO'] :
+            hasil = respomse_text
+            break
 
-    state['session_done'] = await llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'), {}) == "YES"
+    state['session_done'] = hasil == "YES"
     return state
        
         

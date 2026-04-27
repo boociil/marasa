@@ -72,32 +72,37 @@ Riwayat Percakapan:
 Teks Pengguna:
 {new_chat}
 """
-    extract_rag = await llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
-        "response_mime_type": "application/json",
-        "response_json_schema":  {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "pertanyaan_asli": {
-                        "type": "string",
-                    },
-                    "kueri_pencarian": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
+    extract_rag_json = []
+
+    while True:
+        try :
+            extract_rag = await llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
+                "response_mime_type": "application/json",
+                "response_json_schema":  {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "pertanyaan_asli": {
+                                "type": "string",
+                            },
+                            "kueri_pencarian": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                            }
                         },
                     }
                 },
-            }
-        },
-    })
-
-    print(extract_rag)
-    extract_rag = json.loads(extract_rag.replace("```",""))
-    
+            })
+            extract_rag_json = json.loads(extract_rag.replace("```",""))
+            break
+        except Exception as e:
+            print(e)
+    print(extract_rag_json)
     ques_arr = []
-    for item in extract_rag:
+    for item in extract_rag_json:
         ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=item['kueri_pencarian']))
     state["question"] = ques_arr
     return state
@@ -159,7 +164,7 @@ async def rag_search(state):
 async def rag_validate(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
-        # print('ques')
+        print(ques)
         chunks = ""
 
         for item in state["question"][index].rag_publikasi_brs :
@@ -196,19 +201,25 @@ Daftar knowledge chunks:
 {chunks}"""
         
         # print(prompt)
-        id_keep_rag = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
-            "response_mime_type": "application/json",
-            "response_json_schema":  {
-                "type": "array",
-                "items": {
-                    "type": "string"
-                }
-            },
-        })
+        id_keep_rag =[]
+        while True:
+            try :
+                id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
+                    "response_mime_type": "application/json",
+                    "response_json_schema":  {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                })
+
+                id_keep_rag = json.loads(id_keep_rag_txt.replace("```",""))
+                break
+            except Exception as e:
+                print(e)
 
         print(id_keep_rag)
-
-        id_keep_rag = json.loads(id_keep_rag.replace("```",""))
 
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag :

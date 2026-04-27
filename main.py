@@ -129,7 +129,7 @@ async def read_root(param: Param, bg: BackgroundTasks):
 # ,'6282319192651'
 # ,'6288224735330']:
     if param.isfromMe :
-        bg.add_task(main_chat, graph, param.jid, param.phoneNumber, param.name, param.text, param.isfromMe)
+        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, param.isfromMe))
         print('asasasasa')
         return []
     else :

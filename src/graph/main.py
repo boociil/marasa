@@ -109,7 +109,7 @@ async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str
     }
 
     
-    result = await graph.invoke(state)
+    result = await graph.ainvoke(state)
     # print(result)
     
     try:
