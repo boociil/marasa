@@ -1,17 +1,18 @@
 from src.graph.rag.retriever import get_rag_data, get_rag_data_arr, get_rag_data_table, get_rag_data_table_arr
 from src.graph.text import LLM_PROMPT
-from src.graph.llm import llm_query
-from src.graph.state import QuestionModel, RagPublikasiBRS, RagData, AnswerModel
+from src.graph.llm import llm_query, llm_query_answer
+from src.graph.state import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
 from dotenv import load_dotenv, find_dotenv
 import os
 import uuid
 import json
 import unicodedata
 from google.genai.types import Tool, GenerateContentConfig
+from langchain_community.tools import DuckDuckGoSearchResults
 
 load_dotenv(find_dotenv()) 
 
-def pecah_question_and_transform_untuk_rag(state) :
+async def pecah_question_and_transform_untuk_rag(state) :
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
 
     new_chat = "\n".join(state["new_chat"])
@@ -35,7 +36,7 @@ Aturan Ekstraksi Pertanyaan:
 
 Aturan Optimasi Kueri Pencarian RAG:
 - Buat minimal 1  kueri pencarian yang mandiri (standalone) untuk setiap pertanyaan yang diekstrak
-- lebih dari kuari pencarian jika ada beberapa indikator yang dicari (misalnya hubunggan variabel a dan b, maka masing-masing a dan b)
+- lebih dari 1 kuari pencarian jika ada beberapa indikator yang dicari (misalnya hubunggan variabel a dan b, maka masing-masing a dan b)
 - Pertahankan bahasa asli
 - Jangan kehilangan konteks utama
 - Perluas konteks dan kata kunci
@@ -71,7 +72,7 @@ Riwayat Percakapan:
 Teks Pengguna:
 {new_chat}
 """
-    extract_rag = llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
+    extract_rag = await llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
         "response_mime_type": "application/json",
         "response_json_schema":  {
             "type": "array",
@@ -92,17 +93,31 @@ Teks Pengguna:
         },
     })
 
-    extract_rag = json.loads(extract_rag)
     print(extract_rag)
+    extract_rag = json.loads(extract_rag.replace("```",""))
+    
     ques_arr = []
     for item in extract_rag:
         ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=item['kueri_pencarian']))
     state["question"] = ques_arr
     return state
 
-def rag_search(state):
+async def rag_search(state):
     for index, item in enumerate(state['question']) :
         query = state["question"][index].rag_ques
+
+        search = DuckDuckGoSearchResults(output_format="list")
+        results_list = search.invoke(state["question"][index].ques)
+
+        for res in results_list:
+            state["question"][index].ddgs.append(
+                DDGS( 
+                    id = str(uuid.uuid4()),
+                    snippet = res['snippet'] ,
+                    title = res['title'],
+                    link = res['link'],
+                )
+            )
 
         docs_pdf = get_rag_data_arr(query, 5)
         for doc, _score in docs_pdf:
@@ -141,7 +156,7 @@ def rag_search(state):
             )
     return state
 
-def rag_validate(state):
+async def rag_validate(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
         # print('ques')
@@ -150,6 +165,8 @@ def rag_validate(state):
         for item in state["question"][index].rag_publikasi_brs :
             chunks += item.print() +'\n\n'
         for item in state["question"][index].rag_data :
+            chunks += item.print() +'\n\n'
+        for item in state["question"][index].ddgs :
             chunks += item.print() +'\n\n'
 
         prompt =f""""
@@ -169,6 +186,9 @@ Aturan ketat:
 - OUTPUT CUKUP Array dari id pengetahuan
 - Urutkan dari yang paling relevan
 
+Format JSON yang diharapkan:
+[string_id]
+
 Pertanyaan:
 {ques}
 
@@ -176,7 +196,7 @@ Daftar knowledge chunks:
 {chunks}"""
         
         # print(prompt)
-        id_keep_rag = llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
+        id_keep_rag = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
             "response_mime_type": "application/json",
             "response_json_schema":  {
                 "type": "array",
@@ -188,7 +208,7 @@ Daftar knowledge chunks:
 
         print(id_keep_rag)
 
-        id_keep_rag = json.loads(id_keep_rag)
+        id_keep_rag = json.loads(id_keep_rag.replace("```",""))
 
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag :
@@ -216,10 +236,20 @@ Daftar knowledge chunks:
                         score= item.score,
                     )
                 )
+        for item in state["question"][index].ddgs :
+            if item.id in id_keep_rag :
+                state["question"][index].ddgs_output.append(
+                    DDGS( 
+                        id = item.id,
+                        snippet = item.snippet,
+                        title = item.title,
+                        link = item.link,
+                    )
+                )
        
     return state
 
-def rag_answer(state):
+async def rag_answer(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
         chunks = ""
@@ -227,6 +257,8 @@ def rag_answer(state):
         for item in state["question"][index].rag_publikasi_brs_output :
             chunks += item.print() +'\n\n'
         for item in state["question"][index].rag_data_output :
+            chunks += item.print() +'\n\n'
+        for item in state["question"][index].ddgs_output :
             chunks += item.print() +'\n\n'
 
         if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
@@ -244,11 +276,7 @@ def rag_answer(state):
             context=chunks,
             question=ques
         )
-        hasil = llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'), config=GenerateContentConfig(
-            tools=[
-                {"url_context": {}},
-            ],
-        ))
+        hasil = await llm_query_answer(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'))
         state["question"][index].answer.append(AnswerModel(type="text", text=hasil))
         
     return state

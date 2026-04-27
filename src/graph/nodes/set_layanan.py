@@ -27,7 +27,7 @@ def set_layanan(state):
             elif number == 4 :
                 state["sis_answer"].extend([f"Mohon tunggu sebentar kak *{state['nama_lengkap']}* ⏳. Saya teruskan pesan ini ke petugas kami agar segera dibantu. 😊"])
         else :
-            state["sis_answer"].extend([menu_bps])
+            state["sis_answer"].extend([menu_bps.format(nama = state["nama_lengkap"])])
             state['is_done'] = True
     
         

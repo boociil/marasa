@@ -9,35 +9,19 @@ from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
 from src.graph.nodes.konsultasi import konsultasi
 from src.graph.state import AnswerModel
+import requests
+import os
+import time
+from dotenv import load_dotenv, find_dotenv
+
+# 1. LOAD ENV (Parent Folder)
+load_dotenv(find_dotenv())
 
 from src.graph.db.models import ChatSession, ChatMessage
 
 ai_disclaimen = "*AI dapat membuat kesalahan"
 
-
-def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
-
-    state = {
-        "session_id": None,
-        "session_done": False,
-        "layanan_type": 0,
-        "need_human": False,
-        "is_done": False,
-
-        "jid": jid,
-        "nama": name,
-        "nama_lengkap": name,
-        "notelp": phoneNumber,
-        "user_is_db": False,
-
-        "use_ai": False,
-        "question": [],
-        "sis_answer": [],
-
-        "new_chat": text,
-        "chat_history": [],
-    }
-
+def build_graph(): 
     builder = StateGraph(BPSState)
     # nodes
     
@@ -99,9 +83,33 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
     builder.add_edge("rag_validate", "rag_answer")
     builder.add_edge("rag_answer", END)
 
-    graph = builder.compile()
-    result = graph.invoke(state)
+    return builder.compile()
+   
 
+async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+    state = {
+        "session_id": None,
+        "session_done": False,
+        "layanan_type": 0,
+        "need_human": False,
+        "is_done": False,
+
+        "jid": jid,
+        "nama": name,
+        "nama_lengkap": name,
+        "notelp": phoneNumber,
+        "user_is_db": False,
+
+        "use_ai": False,
+        "question": [],
+        "sis_answer": [],
+
+        "new_chat": text,
+        "chat_history": [],
+    }
+
+    
+    result = await graph.invoke(state)
     # print(result)
     
     try:
@@ -153,8 +161,22 @@ def main_chat(jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: 
 
     if len(result['question']) > 0 :
         answer.append(AnswerModel(type="text", text=ai_disclaimen))
+
+    path_ori = []
+    for item_answer in answer:
+        if item_answer.file_path is None :
+            requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': jid, 'text': item_answer.text})
+        else :
+            if item_answer.file_path not in path_ori :
+                with open(item_answer.file_path, 'rb') as f:
+                    # FORMAT: (filename, file_object, mimetype)
+                    files = {
+                        'image': ('image.jpg', f, 'image/jpeg') 
+                    }
+                    
+                    requests.post(os.getenv('URL_JS')+"/send-message", data={'jid': jid, 'text': item_answer.text}, files=files)
+                path_ori.append(item_answer.file_path)
     
-    return jid, answer
 
 
 def main_chat_cmd(text: list[str], chat_history: list[str]): 

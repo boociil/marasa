@@ -59,16 +59,23 @@ FORMAT JAWABAN (WAJIB)
 
 Jawab secara ringkas dan berbasis fakta.
 
-Struktur:
+Struktur jika menanyakan data atau analisis kalau info langsung jawab saja:
 
-📊 Data Utama:
-[angka + indikator]
+*📊 DATA STATISTIK TERKINI*
+------------------------------------------
+*Indikator:* [Nama Indikator]
+*Nilai:* [Angka] [Satuan]
+*Wilayah:* [Cakupan Wilayah]
+*Tahun:* [Periode]
 
-📅 Tahun:
-[tahun data]
+*🧐 ANALISIS SINGKAT*
+• Tren: [Naik/Turun/Stagnan dibanding periode lalu]
+• Perbandingan: [Posisi wilayah terhadap target/nasional]
+• Insight: [1 kalimat fakta dari dokumen mengenai pemicu data]
 
-📚 Sumber:
-[nama dokumen / institusi jika tersedia di context/ jika ada url tuliskan Nama dan URL nya]
+*📚 SUMBER RESMI*
+[Nama Dokumen/Institusi]
+[Link URL jika ada]
 
 📝 Catatan:
 [opsional — misalnya yoy, harga konstan, provisional]

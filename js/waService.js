@@ -28,7 +28,7 @@ async function question(promt) {
     
 }
 
-const DEBOUNCE_MS = 10_000
+const DEBOUNCE_MS = 3_000
 
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('./waSocketSesi')
@@ -106,6 +106,8 @@ async function connectToWhatsApp() {
           debounceTimers.delete(jid_local)
         } catch (error) {
           console.error(error.message);
+          console.log(JSON.stringify(allMessages))
+          
           debounceTimers.delete(jid_local)
           debounceTimers.set(jid_local, setTimeout(() => { repeat_timer(jid_local, isfromMe_local)}, DEBOUNCE_MS))
         }
