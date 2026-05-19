@@ -75,7 +75,7 @@ Struktur jika menanyakan data atau analisis kalau info langsung jawab saja:
 
 *📚 SUMBER RESMI*
 [Nama Dokumen/Institusi]
-[Link URL jika ada]
+[Link URL jika ada dan nama nya]
 
 📝 Catatan:
 [opsional — misalnya yoy, harga konstan, provisional]
