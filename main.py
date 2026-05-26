@@ -1,14 +1,14 @@
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 # from src.query_data import query_rag
-from src.graph.main import main_chat, build_graph
+from graph.main import main_chat, build_graph
 from contextlib import asynccontextmanager
 import asyncio
 import requests
 from dotenv import load_dotenv
 import os
 from peewee import fn
-from src.graph.db.models import User, ChatSession, ChatMessage, get_user_by_phone
+from db.models import User, ChatSession, ChatMessage, get_user_by_phone
 from datetime import datetime, timedelta
 from fastapi_utils.tasks import repeat_every
 

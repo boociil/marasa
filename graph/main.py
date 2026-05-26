@@ -1,14 +1,14 @@
 from langgraph.graph import StateGraph, START, END
 
-from src.graph.state import BPSState
-from src.graph.nodes.registrasi import registrasi
-from src.graph.nodes.set_layanan import set_layanan
-from src.graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
-from src.graph.nodes.complaint import create_ticket
-from src.graph.nodes.end_checker import end_checker
-from src.graph.nodes.human_node import human_node
-from src.graph.nodes.konsultasi import konsultasi
-from src.graph.state import AnswerModel
+from graph.state import BPSState
+from graph.nodes.registrasi import registrasi
+from graph.nodes.set_layanan import set_layanan
+from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
+from graph.nodes.complaint import create_ticket
+from graph.nodes.end_checker import end_checker
+from graph.nodes.human_node import human_node
+from graph.nodes.konsultasi import konsultasi
+from graph.state import AnswerModel
 import requests
 import os
 import time
@@ -17,7 +17,7 @@ from dotenv import load_dotenv, find_dotenv
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
 
-from src.graph.db.models import ChatSession, ChatMessage
+from db.models import ChatSession, ChatMessage
 
 ai_disclaimen = "*AI dapat membuat kesalahan"
 
@@ -86,7 +86,9 @@ def build_graph():
     return builder.compile()
    
 
-async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+
+    user = get_user_by_phone(state['notelp'])
     state = {
         "session_id": None,
         "session_done": False,

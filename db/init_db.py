@@ -1,4 +1,4 @@
-from src.graph.db.models import User, ChatSession, ChatMessage, Ticket
+from db.models import User, ChatSession, ChatMessage, Ticket
 from peewee import *
 import os
 from dotenv import load_dotenv, find_dotenv

@@ -66,7 +66,7 @@ async def main():
             # 2. Bot Response Logic
             # You can replace this with complex logic or an API call
 
-            answer =  main_chat_cmd([user_input], chat_history)
+            answer =  main_chat_cmd(graph, [user_input], chat_history)
             chat_history.append("user :"+user_input)
             for item_answer in answer:
                 if item_answer.file_path is None :

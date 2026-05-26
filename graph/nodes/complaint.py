@@ -1,5 +1,5 @@
-from src.graph.db.models import User, get_user_by_phone
-from src.graph.db.models import Ticket
+from db.models import User, get_user_by_phone
+from db.models import Ticket
 
 def create_ticket(state):
     user = get_user_by_phone(state['notelp'])

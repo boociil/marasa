@@ -1,5 +1,5 @@
 from dotenv import load_dotenv, find_dotenv
-from src.graph.llm import llm_query
+from graph.llm import llm_query
 import os
 
 load_dotenv(find_dotenv()) 

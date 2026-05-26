@@ -1,5 +1,5 @@
 from peewee import *
-from src.graph.db.db import BaseModel
+from db.db import BaseModel
 import datetime
 
 class User(BaseModel):

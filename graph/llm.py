@@ -1,10 +1,8 @@
 from langchain_ollama import OllamaLLM
 from dotenv import load_dotenv, find_dotenv
-from langchain_core.prompts import ChatPromptTemplate
 import os
 from google import genai
 import asyncio
-from google.genai.types import Tool, GenerateContentConfig
 
 load_dotenv(find_dotenv()) 
 
@@ -23,8 +21,6 @@ async def llm_query(prompt: str, api_key_s, config) :
     while True:
         try:
             model = "gemma-4-31b-it"
-            if attmpt <= 1 :
-                model = "gemini-3.1-flash-lite-preview"
     
             response = client.models.generate_content(
                 model=model, contents=prompt, config=config
@@ -47,32 +43,15 @@ async def llm_query_answer(prompt: str, api_key_s) :
     while True:
         try:
             model = "gemma-4-31b-it"
-            if attmpt <= 1 :
-                model = "gemini-3.1-flash-lite-preview"
-            if model == "gemini-3.1-flash-lite-preview" :
-                response = client.models.generate_content(
-                    model=model, contents=prompt, config=GenerateContentConfig(
-                        tools=[
-                            {"url_context": {}},
-                        ],
-                    )
-                )
-                if response and response.text:
-                    return response.text
-                else:
-                    print(response)
-                    attmpt += 1
-                    await asyncio.sleep(2)
-            else :
-                response = client.models.generate_content(
-                    model=model, contents=prompt
-                )
-                if response and response.text:
-                    return response.text
-                else:
-                    print(response)
-                    attmpt += 1
-                    await asyncio.sleep(2)
+            response = client.models.generate_content(
+                model=model, contents=prompt
+            )
+            if response and response.text:
+                return response.text
+            else:
+                print(response)
+                attmpt += 1
+                await asyncio.sleep(2)
         except Exception as e:
             print(e)
             attmpt += 1

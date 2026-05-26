@@ -1,6 +1,6 @@
-from src.graph.db.models import User, get_user_by_phone
+from db.models import User, get_user_by_phone
 import re
-from src.graph.text import Form_Identitas, Kalimat_Pembuka
+from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
 
 FORM_PATTERNS = {

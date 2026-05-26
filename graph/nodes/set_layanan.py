@@ -1,5 +1,5 @@
-from src.graph.db.models import get_or_create_active_session, load_last_messages
-from src.graph.text import menu_bps
+from db.models import get_or_create_active_session, load_last_messages
+from graph.text import menu_bps
 
 def set_layanan(state):
     session, baru_status = get_or_create_active_session(state['notelp'])
