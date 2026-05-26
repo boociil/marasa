@@ -1,5 +1,6 @@
 import argparse
-from src.download_pdf import download_pdf_main
+from src.download_pdf import download_pdf_main, download_pdf_list
+from src.populate.populate_pdf_list import populate_daftar_pdf
 from src.populate.populate_pdf import populate_pdf
 from src.populate.populate_data import populate_table
 from src.populate.populate_image import populate_image
@@ -11,8 +12,10 @@ import asyncio
 
 async def main():
     parser = argparse.ArgumentParser()
-    
+
+    parser.add_argument("--download_pdf_list", action="store_true", help="Download data.")
     parser.add_argument("--download_pdf", action="store_true", help="Download data.")
+    parser.add_argument("--populate_daftar", action="store_true", help="Populate daftar.")
     parser.add_argument("--populate_table", action="store_true", help="Populate table.")
     parser.add_argument("--populate_pdf", action="store_true", help="Populate pdf.")
     parser.add_argument("--populate_image", action="store_true", help="Populate image.")
@@ -22,9 +25,14 @@ async def main():
 
 
     args = parser.parse_args()
-
+    if args.download_pdf_list:
+        download_pdf_list()
+        return   
     if args.download_pdf:
         download_pdf_main()
+        return    
+    if args.populate_daftar:
+        populate_daftar_pdf()
         return    
     if args.populate_pdf:
         print("📥 Running PopulateChrom...")

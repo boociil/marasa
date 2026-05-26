@@ -78,17 +78,16 @@ def download_file_batch(model_type, data_json):
     need_download = []
     
     for item in data_json[model_type]:
-        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year >= 2010 :
-            if model_type == 'publication' : 
-                title = secure_filename(item['rl_date']+'-'+item['title'])
-                pdf_url = item['pdf'] 
-                if pdf_url:
-                    need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
-            elif model_type == 'pressrelease' : 
-                title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
-                pdf_url = item['pdf'] 
-                if pdf_url:
-                    need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
+        if model_type == 'publication' and datetime.strptime(item['rl_date'], "%Y-%m-%d").year >= 2010:
+            title = secure_filename(item['rl_date']+'-'+item['title'])
+            pdf_url = item['pdf'] 
+            if pdf_url:
+                need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
+        elif model_type == 'pressrelease' and datetime.strptime(item['rl_date'], "%Y-%m-%d").year == datetime.now().year :
+            title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
+            pdf_url = item['pdf'] 
+            if pdf_url:
+                need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
 
     print('Download dengan panjang : '+str(len(need_download)))
     
@@ -144,6 +143,5 @@ def download_pdf_main() :
         data = {'publication': [], 'pressrelease': []}
     except json.JSONDecodeError:
         data = {'publication': [], 'pressrelease': []}
-    print('ada aku disini')
     download_file_batch("publication", data)
     download_file_batch("pressrelease", data)

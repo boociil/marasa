@@ -9,7 +9,6 @@ from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
 from src.graph.nodes.konsultasi import konsultasi
 from src.graph.state import AnswerModel
-from main import MemoryStore
 import requests
 import os
 import time
@@ -87,7 +86,7 @@ def build_graph():
     return builder.compile()
    
 
-async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], memory_store: MemoryStore, isfromMe: bool): 
+async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
     state = {
         "session_id": None,
         "session_done": False,

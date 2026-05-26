@@ -5,6 +5,9 @@ from langchain_chroma import Chroma
 from dotenv import load_dotenv, find_dotenv
 import os
 import json
+from html import unescape
+import re
+from datetime import datetime
 
 load_dotenv(find_dotenv()) 
 
@@ -33,11 +36,10 @@ def populate_daftar_pdf():
 
 
     for item in data['publication'] :
-        judul__ = item['title']
-        abstract__ =  item['abstract']
-        page_content_ = """"Judul : {judul__}
+        page_content_ = f""""Judul : {item['title']}
+
 abstract
-{abstract__}"""
+{item['abstract']}"""
         
         metadata_ = {
             'tipe': "publication",
@@ -45,17 +47,60 @@ abstract
             'rl_date': item['rl_date'],
             'updt_date': item['updt_date'],
         }
-        ids.append(item['rl_date']+'-|-'+item["pub_id"])
+        ids.append(item['rl_date']+'---'+str(item["pub_id"]))
         documents.append(Document(page_content=page_content_, metadata=metadata_))
-        print(page_content_)
-        break
 
+    data_pressrelease_id = {}
+    data_pressrelease = []
     for item in data['pressrelease'] :
-        judul__ = item['title']
-        abstract__ =  item['abstract']
-        page_content_ = """"Judul : {judul__}
+        if not item["brs_id"] in data_pressrelease_id :
+            data_pressrelease_id[item["brs_id"]] = len(data_pressrelease)
+            data_pressrelease.append(item)
+        else :
+            index_awal = data_pressrelease_id[item["brs_id"]]
+            rl_awal = datetime.strptime(data_pressrelease[index_awal]['rl_date'], "%Y-%m-%d")
+            rl_item = datetime.strptime(item['rl_date'], "%Y-%m-%d")
+            updt_awal = datetime.strptime(data_pressrelease[index_awal]['updt_date'], "%Y-%m-%d") if data_pressrelease[index_awal]['updt_date'] is not None else None
+            updt_item = datetime.strptime(item['updt_date'], "%Y-%m-%d") if item['updt_date'] is not None else None
+
+            if rl_awal == rl_item and updt_awal == updt_item :
+                pass
+            elif rl_item < rl_awal :
+                pass
+            elif rl_item > rl_awal :
+                data_pressrelease[data_pressrelease_id[item["brs_id"]]] = item
+            else:
+                if updt_item is None:
+                    pass
+                elif updt_awal is None:
+                    data_pressrelease[data_pressrelease_id[item["brs_id"]]] = item
+                elif updt_item < updt_awal :
+                    pass
+                elif updt_item > updt_awal :
+                    data_pressrelease[data_pressrelease_id[item["brs_id"]]] = item
+
+
+    print(f"Panjang awal : {len(data['pressrelease'])}")
+    print(f"Panjang awal : {len(data_pressrelease)}")
+    for item in data_pressrelease :
+        decoded = unescape(item['abstract'])
+
+        # Ambil isi dalam tag <li>
+        items = re.findall(r"<li>(.*?)</li>", decoded, re.DOTALL)
+
+        # Hapus tag HTML lain seperti <i>
+        cleaned = [
+            re.sub(r"<.*?>", "", item).strip()
+            for item in items
+        ]
+
+        # Gabungkan jadi raw text
+        raw_text = "\n".join(f"- {item}" for item in cleaned)
+
+        page_content_ = f""""Judul : {item['title']}
+        
 abstract
-{abstract__}"""
+{ raw_text }"""
         
         metadata_ = {
             'tipe': "pressrelease",
@@ -63,12 +108,11 @@ abstract
             'rl_date': item['rl_date'],
             'updt_date': item['updt_date'],
         }
-        ids.append(item['rl_date']+'-|-'+item["pub_id"])
+        ids.append(item['rl_date']+'---'+str(item["brs_id"]))
         documents.append(Document(page_content=page_content_, metadata=metadata_))
-        print(page_content_)
-        break
 
-    # db.add_documents(
-    #     documents,
-    #     ids=ids,
-    # )
+    print(f"Process {len(documents)} Dokumen")
+    db.add_documents(
+        documents,
+        ids=ids,
+    )

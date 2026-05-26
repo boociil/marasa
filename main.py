@@ -27,7 +27,7 @@ class MemoryStore:
     def cache_get(self, key):
         return self.data.get(key)
     def cache_delete(self, key):
-        del self.data.pop(key)
+        self.data.pop(key)
 
 memory_store = MemoryStore()
 
