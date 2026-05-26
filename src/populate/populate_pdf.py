@@ -14,7 +14,7 @@ import unicodedata
 
 load_dotenv(find_dotenv()) 
 
-CHROMA_PATH = os.getenv('CHROMA_PATH')
+CHROMA_PATH = os.getenv('CHROMA_PATH_ISI_PDF')
 DATA_PATH = os.getenv('DATA_PATH')
 PDF_JSON = os.getenv('PDF_JSON')
 PATH_LAST = os.getenv('PATH_LAST')

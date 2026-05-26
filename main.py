@@ -14,6 +14,23 @@ from fastapi_utils.tasks import repeat_every
 
 load_dotenv()
 
+# cache registras => registrasi_notlp
+# cache source => minta link (pdf)
+# 
+
+
+class MemoryStore:
+    def __init__(self):
+        self.data = {}
+    def cache_put(self, key, value):
+        self.data[key] = value
+    def cache_get(self, key):
+        return self.data.get(key)
+    def cache_delete(self, key):
+        del self.data.pop(key)
+
+memory_store = MemoryStore()
+
 graph = build_graph()
 app = FastAPI()
 
@@ -129,7 +146,7 @@ async def read_root(param: Param, bg: BackgroundTasks):
 # ,'6282319192651'
 # ,'6288224735330']:
     if param.isfromMe :
-        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, param.isfromMe))
+        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, memory_store, param.isfromMe))
         print('asasasasa')
         return []
     else :

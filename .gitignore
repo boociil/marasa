@@ -2,7 +2,6 @@
 .DS_Store
 backup
 chroma
-chroma_table
 .venv
 .env
 data

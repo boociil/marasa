@@ -6,6 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 import json
 import threading
 from tqdm import tqdm
+from datetime import datetime
 
 
 load_dotenv(find_dotenv())
@@ -77,16 +78,17 @@ def download_file_batch(model_type, data_json):
     need_download = []
     
     for item in data_json[model_type]:
-        if model_type == 'publication' : 
-            title = secure_filename(item['rl_date']+'-'+item['title'])
-            pdf_url = item['pdf'] 
-            if pdf_url:
-                need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
-        elif model_type == 'pressrelease' : 
-            title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
-            pdf_url = item['pdf'] 
-            if pdf_url:
-                need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
+        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year >= 2010 :
+            if model_type == 'publication' : 
+                title = secure_filename(item['rl_date']+'-'+item['title'])
+                pdf_url = item['pdf'] 
+                if pdf_url:
+                    need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
+            elif model_type == 'pressrelease' : 
+                title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
+                pdf_url = item['pdf'] 
+                if pdf_url:
+                    need_download.append({'url' : pdf_url, 'folder' : folder_data, 'filename': title})
 
     print('Download dengan panjang : '+str(len(need_download)))
     
@@ -126,9 +128,22 @@ def fetch_bps_data_list_new(model_type, data_json):
             page += 1
             time.sleep(1) # Jeda agar tidak terkena rate limit
 
+def download_pdf_list() :
+    data_json = {'publication': [], 'pressrelease': []}
+    fetch_bps_data_list_new("publication", data_json)
+    fetch_bps_data_list_new("pressrelease", data_json)
+    with open(os.getenv('PDF_JSON'), "w", encoding="utf-8") as f:
+        json.dump(data_json, f)
     
 def download_pdf_main() :
-    data_json = {'publication': [], 'pressrelease': []}
-    fetch_bps_data_list_new("pressrelease", data_json)
+    data = {'publication': [], 'pressrelease': []}
+    try:
+        with open(os.getenv('PDF_JSON'), "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = {'publication': [], 'pressrelease': []}
+    except json.JSONDecodeError:
+        data = {'publication': [], 'pressrelease': []}
     print('ada aku disini')
-    download_file_batch("pressrelease", data_json)
+    download_file_batch("publication", data)
+    download_file_batch("pressrelease", data)

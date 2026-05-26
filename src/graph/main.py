@@ -9,6 +9,7 @@ from src.graph.nodes.end_checker import end_checker
 from src.graph.nodes.human_node import human_node
 from src.graph.nodes.konsultasi import konsultasi
 from src.graph.state import AnswerModel
+from main import MemoryStore
 import requests
 import os
 import time
@@ -86,7 +87,7 @@ def build_graph():
     return builder.compile()
    
 
-async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str], memory_store: MemoryStore, isfromMe: bool): 
     state = {
         "session_id": None,
         "session_done": False,
@@ -179,7 +180,7 @@ async def main_chat(graph, jid: str, phoneNumber: str, name: str, text: list[str
     
 
 
-def main_chat_cmd(text: list[str], chat_history: list[str]): 
+async def main_chat_cmd(graph, text: list[str], chat_history: list[str]): 
 
     state = {
         "session_id": None,
@@ -199,23 +200,7 @@ def main_chat_cmd(text: list[str], chat_history: list[str]):
         "chat_history": [],
     }
 
-    builder = StateGraph(BPSState)
-    # nodes
-
-    builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
-    builder.add_node("rag_search", rag_search)
-    builder.add_node("rag_validate", rag_validate)
-    builder.add_node("rag_answer", rag_answer)
-    
-
-    builder.add_edge(START, "pecah_question_and_transform_untuk_rag")
-    builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
-    builder.add_edge("rag_search", "rag_validate")
-    builder.add_edge("rag_validate", "rag_answer")
-    builder.add_edge("rag_answer", END)
-
-    graph = builder.compile()
-    result = graph.invoke(state)
+    result = await graph.ainvoke(state)
 
     answer = []
     for item_ques in result['question']:

@@ -1,16 +1,15 @@
 import argparse
 from src.download_pdf import download_pdf_main
-from src.populate_pdf import populate_pdf
-from src.populate_data import populate_table
-from src.populate_image import populate_image
-from src.query_data import query_rag
-from src.graph.main import main_chat_cmd
+from src.populate.populate_pdf import populate_pdf
+from src.populate.populate_data import populate_table
+from src.populate.populate_image import populate_image
+from src.graph.main import main_chat_cmd, build_graph
 
 from src.graph.db.init_db import init_db
-    
+import asyncio
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--download_pdf", action="store_true", help="Download data.")
@@ -38,13 +37,11 @@ def main():
         populate_image()
         return
     
-    if args.query:
-        return query_rag(args.query)
-    
     if args.create_db:
         return init_db()
     
     if args.start_chat:
+        graph = build_graph()
         print("--- Chatbot Started (Type 'quit' to exit) ---")
         chat_history = []
         while True:
@@ -75,4 +72,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
