@@ -96,7 +96,6 @@ async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromM
         "need_human": False,
         "is_done": False,
 
-        "jid": jid,
         "nama": name,
         "nama_lengkap": name,
         "notelp": phoneNumber,
@@ -112,7 +111,6 @@ async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromM
 
     
     result = await graph.ainvoke(state)
-    # print(result)
     
     try:
         session = ChatSession.get_by_id(result['session_id'])

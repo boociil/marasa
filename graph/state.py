@@ -1,70 +1,7 @@
 from typing import TypedDict, List, Optional
-from pydantic import BaseModel
 from typing import Optional
 
-class RagPublikasiBRS(BaseModel):
-    id: str
-    type: str
-    bps_id: str
-    title: str 
-    halaman: int
-    content: str
-    rl_date: str
-    score: float
-    def print(self):
-        return f"""ID Pengetahuan :  {self.id}
-jenis : internal
-Judul : {self.title}
-content : {self.content}
-Release : {self.rl_date}
-"""
-
-class RagData(BaseModel):
-    id: str
-    judul: str 
-    url: str
-    content: str
-    score: float
-    def print(self):
-        return f"""ID Pengetahuan :  {self.id}
-jenis : internal
-Judul : {self.judul}
-content : {self.content}
-Url : {self.url}
-"""
-    
-class DDGS(BaseModel):
-    id: str
-    snippet: str 
-    title: str
-    link: str
-    def print(self):
-        return f"""ID Pengetahuan :  {self.id}
-jenis : search
-Judul : {self.title}
-snippet : {self.snippet}
-Url : {self.link}
-"""
-
-class AnswerModel(BaseModel):
-    type: str #file, text, system
-    file_path: Optional[str] = None
-    text: Optional[str] = None
-
-class QuestionModel(BaseModel):
-    ques: Optional[str] = None
-    rag_ques: list[str] = []
-    answer: list[AnswerModel] = []
-    rag_publikasi_brs: list[RagPublikasiBRS] = []
-    rag_data: list[RagData] = []
-    ddgs: list[DDGS] = []
-    rag_publikasi_brs_output: list[RagPublikasiBRS] = []
-    rag_data_output: list[RagData] = []
-    ddgs_output: list[DDGS] = []
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+from db.models_other import QuestionModel, ChatMessage
 
 class BPSState(TypedDict):
     session_id: Optional[str]
@@ -73,7 +10,6 @@ class BPSState(TypedDict):
     need_human: bool
     is_done: bool
     
-    jid: str
     nama: str
     notelp: str
     nama_lengkap: str

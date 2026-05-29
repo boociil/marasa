@@ -3,6 +3,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from google import genai
 import asyncio
+from loguru import logger
 
 load_dotenv(find_dotenv()) 
 
@@ -28,11 +29,11 @@ async def llm_query(prompt: str, api_key_s, config) :
             if response and response.text:
                 return response.text
             else:
-                print(response)
+                logger.info(response)
                 attmpt += 1
                 await asyncio.sleep(2)
         except Exception as e:
-            print(e)
+            logger.info(e)
             attmpt += 1
             await asyncio.sleep(2)
 
@@ -49,11 +50,11 @@ async def llm_query_answer(prompt: str, api_key_s) :
             if response and response.text:
                 return response.text
             else:
-                print(response)
+                logger.info(response)
                 attmpt += 1
                 await asyncio.sleep(2)
         except Exception as e:
-            print(e)
+            logger.info(e)
             attmpt += 1
             await asyncio.sleep(2)
        

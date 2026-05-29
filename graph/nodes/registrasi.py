@@ -2,6 +2,7 @@ from db.models import User, get_user_by_phone
 import re
 from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
+from loguru import logger
 
 FORM_PATTERNS = {
     "nama_lengkap": r"nama\s*lengkap\s*:\s*(.*)",
@@ -39,7 +40,7 @@ def registrasi(state):
             state['is_done'] = True
         else:
             try:
-                print(extract_form)
+                logger.info(extract_form)
                 
                 # 2. Gunakan .get() agar terhindar dari KeyError jika regex gagal menangkap field
                 email_input = extract_form.get('email', '').strip()
@@ -77,19 +78,19 @@ def registrasi(state):
                 )
            
             except EmailNotValidError as e:
-                print(f"Error Email: {e}")
+                logger.info(f"Error Email: {e}")
                 state["sis_answer"] = [
                     "Mohon maaf email tidak sesuai format"
                 ]
                 state['is_done'] = True
             except ValueError as e:
-                print(f"Error Tahun: {e}")
+                logger.info(f"Error Tahun: {e}")
                 state["sis_answer"] = [
                     "Mohon maaf tahun lahir tidak sesuai format"
                 ]
                 state['is_done'] = True
             except Exception as e:
-                print(f"Error Umum: {e}")
+                logger.info(f"Error Umum: {e}")
                 state["sis_answer"] = [
                     "Mohon mengisi identitas dengan menyalin form secara lengkap"
                 ]

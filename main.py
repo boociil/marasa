@@ -1,35 +1,27 @@
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
-# from src.query_data import query_rag
 from graph.main import main_chat, build_graph
-from contextlib import asynccontextmanager
 import asyncio
-import requests
 from dotenv import load_dotenv
 import os
-from peewee import fn
-from db.models import User, ChatSession, ChatMessage, get_user_by_phone
-from datetime import datetime, timedelta
-from fastapi_utils.tasks import repeat_every
+from loguru import logger
+from db.models import iddle_task
+from cache import shared_cache
 
 load_dotenv()
 
-# cache registras => registrasi_notlp
-# cache source => minta link (pdf)
-# 
+
+if not os.path.exists("log"):
+    os.makedirs("log")
+
+logger.add(
+    "log/api_{time:YYYY-MM-DD}.log", # Nama file akan jadi seperti log/api_2026-05-26.log
+    rotation="00:00",                # Buat file baru setiap jam 12 malam (tengah malam)
+    retention="30 days",             # Opsional: Otomatis hapus file log yang lebih tua dari 30 hari
+    level="INFO"
+)
 
 
-class MemoryStore:
-    def __init__(self):
-        self.data = {}
-    def cache_put(self, key, value):
-        self.data[key] = value
-    def cache_get(self, key):
-        return self.data.get(key)
-    def cache_delete(self, key):
-        self.data.pop(key)
-
-memory_store = MemoryStore()
 
 graph = build_graph()
 app = FastAPI()
@@ -37,27 +29,7 @@ app = FastAPI()
 @app.on_event("startup")
 @repeat_every(seconds=60)
 def iddle_task():
-    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
-    idle_sessions = (
-        ChatSession
-        .select(
-            ChatSession,
-            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
-        )
-        .where(
-            (ChatSession.layanan == 3) &
-            (ChatSession.is_done == False)
-        )
-        .join(ChatMessage)
-        .group_by(ChatSession)
-        .having(fn.MAX(ChatMessage.created_at) < ten_minutes_ago)
-    )
-
-    for item in idle_sessions :
-        user = get_user_by_phone(item.phone)
-        item.is_done = True
-        item.save()
-        requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': user.jid, 'text': 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊'})
+    asyncio.create_task(iddle_task())
 
 
 class Param(BaseModel):
@@ -69,9 +41,6 @@ class Param(BaseModel):
 
 @app.post("/")
 async def read_root(param: Param, bg: BackgroundTasks):
-    print("main")
-    print(param)
-    # print(param.phoneNumber)
 #     if param.phoneNumber in ['6285283036590'
 # ,'6285234609332'
 # ,'6281218632475'
@@ -146,8 +115,7 @@ async def read_root(param: Param, bg: BackgroundTasks):
 # ,'6282319192651'
 # ,'6288224735330']:
     if param.isfromMe :
-        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, memory_store, param.isfromMe))
-        print('asasasasa')
+        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, param.isfromMe))
         return []
     else :
         return []
@@ -155,5 +123,4 @@ async def read_root(param: Param, bg: BackgroundTasks):
 
 @app.post("/health_check")
 def health_check():
-    print("health_check")
     return["a", "b"]

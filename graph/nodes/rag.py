@@ -9,6 +9,7 @@ import json
 import unicodedata
 from google.genai.types import Tool, GenerateContentConfig
 from langchain_community.tools import DuckDuckGoSearchResults
+from loguru import logger
 
 load_dotenv(find_dotenv()) 
 
@@ -99,8 +100,8 @@ Teks Pengguna:
             extract_rag_json = json.loads(extract_rag.replace("```",""))
             break
         except Exception as e:
-            print(e)
-    print(extract_rag_json)
+            logger.info(e)
+    logger.info(extract_rag_json)
     ques_arr = []
     for item in extract_rag_json:
         ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=item['kueri_pencarian']))
@@ -164,7 +165,6 @@ async def rag_search(state):
 async def rag_validate(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
-        print(ques)
         chunks = ""
 
         for item in state["question"][index].rag_publikasi_brs :
@@ -217,9 +217,9 @@ Daftar knowledge chunks:
                 id_keep_rag = json.loads(id_keep_rag_txt.replace("```",""))
                 break
             except Exception as e:
-                print(e)
+                logger.info
 
-        print(id_keep_rag)
+        logger.info
 
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag :

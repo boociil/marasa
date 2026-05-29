@@ -1,6 +1,6 @@
 from peewee import *
 from db.db import BaseModel
-import datetime
+from datetime import datetime, timedelta
 
 class User(BaseModel):
     nama = CharField(max_length=255)
@@ -121,3 +121,26 @@ def load_last_messages(session: ChatSession):
             content.append('bot : '+item.content)
 
     return content
+
+def iddle_task():
+    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
+    idle_sessions = (
+        ChatSession
+        .select(
+            ChatSession,
+            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
+        )
+        .where(
+            (ChatSession.layanan == 3) &
+            (ChatSession.is_done == False)
+        )
+        .join(ChatMessage)
+        .group_by(ChatSession)
+        .having(fn.MAX(ChatMessage.created_at) < ten_minutes_ago)
+    )
+
+    for item in idle_sessions :
+        user = get_user_by_phone(item.phone)
+        item.is_done = True
+        item.save()
+        # requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': user.jid, 'text': 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊'})
