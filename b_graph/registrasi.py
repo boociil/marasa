@@ -1,8 +1,11 @@
-from db.models import User, get_user_by_phone
 import re
 from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
 from loguru import logger
+from db.model_wablas import WablasIncomingMessage
+from db.models import WablasIncomingMessage, User
+from typing import Tuple
+from wablas.send import send_simple_text
 
 FORM_PATTERNS = {
     "nama_lengkap": r"nama\s*lengkap\s*:\s*(.*)",
@@ -21,23 +24,27 @@ def extract_form_data(text: str):
         if match:
             result[field] = match.group(1).strip()
     return result
-def registrasi(state):
-    user = get_user_by_phone(state['notelp'])
+
+def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User, bool]:
+    phone = message.phone
+    nama_lengkap = user.nama_lengkap if user is not None else message.pushName
+    stop = False
+
+    if user is not None :
+        stop = True
 
     if user is None:
         check_iden = False
         extract_form = {}
-        for item in state['new_chat']:
-            if 'nama lengkap' in item.lower():
-                check_iden = True
-                extract_form = extract_form_data(item)
+
+        if 'nama lengkap' in message.message.lower():
+            check_iden = True
+            extract_form = extract_form_data(message.message)
         
         if not check_iden: 
-            state["sis_answer"] = [
-                Kalimat_Pembuka.format(nama = state['nama']),
-                Form_Identitas
-            ]
-            state['is_done'] = True
+            send_simple_text(phone, Kalimat_Pembuka.format(nama = nama_lengkap))
+            send_simple_text(phone, Form_Identitas)
+            stop = True
         else:
             try:
                 logger.info(extract_form)
@@ -67,9 +74,8 @@ def registrasi(state):
                 validate_email(email_input)
                 
                 user = User.create(
-                    jid = state['jid'],
-                    nama = state['nama'],
-                    notelp = state['notelp'],
+                    nama = message.pushName,
+                    notelp = phone,
                     email = email_input,
                     nama_lengkap = nama_input,
                     pekerjaan = pekerjaan_input,
@@ -79,22 +85,16 @@ def registrasi(state):
            
             except EmailNotValidError as e:
                 logger.info(f"Error Email: {e}")
-                state["sis_answer"] = [
-                    "Mohon maaf email tidak sesuai format"
-                ]
-                state['is_done'] = True
+                send_simple_text(phone, "Mohon maaf email tidak sesuai format\ncontoh : abc@contoh.com")
+                stop = True
             except ValueError as e:
                 logger.info(f"Error Tahun: {e}")
-                state["sis_answer"] = [
-                    "Mohon maaf tahun lahir tidak sesuai format"
-                ]
-                state['is_done'] = True
+                send_simple_text(phone, "Mohon maaf tahun lahir tidak sesuai format\ncontoh : 1995")
+                stop = True
             except Exception as e:
                 logger.info(f"Error Umum: {e}")
-                state["sis_answer"] = [
-                    "Mohon mengisi identitas dengan menyalin form secara lengkap"
-                ]
-                state['is_done'] = True
-    else:
-        state['nama_lengkap'] = user.nama_lengkap
-        state['user_is_db'] = True
+                send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
+                stop = True
+    
+     
+    return user, stop

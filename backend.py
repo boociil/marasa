@@ -1,12 +1,12 @@
 import argparse
-from src.download_pdf import download_pdf_main, download_pdf_list
-from src.populate.populate_pdf_list import populate_daftar_pdf
-from src.populate.populate_pdf import populate_pdf
-from src.populate.populate_data import populate_table
-from src.populate.populate_image import populate_image
-from src.graph.main import main_chat_cmd, build_graph
+from populate.download_pdf import download_pdf_main, download_pdf_list
+from populate.populate.populate_pdf_list import populate_daftar_pdf
+from populate.populate.populate_pdf import populate_pdf
+from populate.populate.populate_data import populate_table
+from populate.populate.populate_image import populate_image
+from graph.main import main_chat_cmd, build_graph
 
-from src.graph.db.init_db import init_db
+from db.init_db import init_db
 import asyncio
 
 

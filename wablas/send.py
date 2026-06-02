@@ -76,3 +76,109 @@ def send_simple_image(phone: str, caption:str, file_path: str) :
         logger.info(f"Error: The file at {file_path} was not found.")
     except requests.exceptions.RequestException as e:
         logger.info(f"Request failed: {e}")
+
+
+def send_menu(phone: str, work_status, nama_lengkap) :
+    url = "https://tegal.wablas.com/api/v2/send-list"
+
+    if work_status : 
+        payload = {
+            "data": [
+                {
+                    "phone": phone,
+                    "message": {
+                        "title": "Menu Layanan",
+                        "description": f"""Halo {nama_lengkap}👋
+    Selamat datang di layanan virtual *Marasa by BPS Sulbar*
+    Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
+                        "buttonText": "Pilih layanan",
+                        "lists": [
+                            {
+                                "title": "1️⃣ Konsultasi Statistik",
+                                "description": "Layanan permintaan data atau konsultasi terkait data statistik BPS."
+                            },
+                            {
+                                "title": "2️⃣ Pengaduan",
+                                "description": "Sampaikan keluhan atau kendala terhadap BPS."
+                            },
+                            {
+                                "title": "3️⃣ Chat AI Statistik 🤖",
+                                "description": "Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS."
+                            },
+                            # {
+                            #     "title": "4️⃣ Lainnya",
+                            #     "description": "Kebutuhan lain yang belum termasuk menu di atas."
+                            # }
+                        ],
+                        "footer": "Silakan pilih 😊"
+                    }
+                }
+            ]
+        }
+    else :
+        payload = {
+            "data": [
+                {
+                    "phone": phone,
+                    "message": {
+                        "title": "Menu Layanan",
+                        "description": f"""Halo {nama_lengkap}👋
+    Selamat datang di layanan virtual *Marasa by BPS Sulbar*
+    Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
+                        "buttonText": "Pilih layanan",
+                        "lists": [
+                            {
+                                "title": "2️⃣ Pengaduan",
+                                "description": "Sampaikan keluhan atau kendala terhadap BPS."
+                            },
+                            {
+                                "title": "3️⃣ Chat AI Statistik 🤖",
+                                "description": "Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS."
+                            },
+                            # {
+                            #     "title": "4️⃣ Lainnya",
+                            #     "description": "Kebutuhan lain yang belum termasuk menu di atas."
+                            # }
+                        ],
+                        "footer": "Silakan pilih 😊"
+                    }
+                }
+            ]
+        }
+
+    headers = {
+        "Authorization": f"{TOKEN}.{SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        # Menggunakan parameter 'json=payload' otomatis mengubah dictionary ke string JSON
+        # verify=False digunakan karena di PHP Anda menggunakan CURLOPT_SSL_VERIFYPEER = 0
+        response = requests.post(url, headers=headers, json=payload, verify=False)
+        
+        # Menampilkan hasil response
+        print(response.text)
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Terjadi kesalahan pada request: {e}")
+
+def send_end_session(phone: str) :
+    flag = "instant"  # Optional: Enable extended message processing
+
+    # Combine token and secret key exactly as in the PHP script
+    combined_token = f"{TOKEN}.{SECRET_KEY}"
+
+    # Set up the API endpoint and query parameters
+    url = "https://tegal.wablas.com/api/send-message"
+    params = {
+        "token": combined_token,
+        "phone": phone,
+        "message": "Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊",
+        "flag": flag
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.info(f"Request failed: {e}")

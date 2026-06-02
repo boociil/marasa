@@ -1,10 +1,10 @@
 from peewee import *
 from db.db import BaseModel
 from datetime import datetime, timedelta
+from wablas.send import send_end_session
 
 class User(BaseModel):
     nama = CharField(max_length=255)
-    jid = CharField(unique=True, max_length=100)
     notelp = CharField(unique=True, max_length=15)
     email = CharField(unique=True, max_length=255, null=True)
     nama_lengkap = CharField(max_length=255, null=True)
@@ -15,12 +15,6 @@ class User(BaseModel):
 
 class ChatSession(BaseModel):
     phone = CharField(max_length=15)
-    user = ForeignKeyField(
-        User,
-        field='notelp',
-        backref='sessions',
-        null=True   # 🔥 ini kuncinya
-    )
     layanan = SmallIntegerField(default=0) #0
     use_ai = BooleanField(default=False)
     is_done = BooleanField(default=False)
@@ -30,7 +24,7 @@ class ChatSession(BaseModel):
 
 
 class ChatMessage(BaseModel):
-    session = ForeignKeyField(ChatSession, backref="messages")
+    session = ForeignKeyField(ChatSession, backref="messages", null=True)
     role = CharField(max_length=10)   # user / bot / sis
     content = TextField()
     created_at = DateTimeField(default=datetime.datetime.now)
@@ -51,17 +45,7 @@ def get_or_create_active_session(phoneNumber: str):
 
     if session:
         return session, False
-
-    (
-        ChatSession
-        .update(is_done=True)
-        .where(
-            (ChatSession.user == phoneNumber) &
-            (ChatSession.is_done == False)
-        )
-        .execute()
-    )
-
+    
     # buat session baru
     new_session = ChatSession.create(phone = phoneNumber)
     return new_session, True
@@ -122,7 +106,36 @@ def load_last_messages(session: ChatSession):
 
     return content
 
-def iddle_task():
+def iddle_task_konsultasi():
+    ten_minutes_ago = datetime.now() - timedelta(hours=12)
+    idle_sessions = (
+        ChatSession
+        .select(
+            ChatSession,
+            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
+        )
+        .where(
+            (ChatSession.layanan == 1) &
+            (ChatSession.is_done == False)
+        )
+        .join(ChatMessage)
+        .group_by(ChatSession)
+        .having(fn.MAX(ChatMessage.created_at) < ten_minutes_ago)
+    )
+
+    for item in idle_sessions :
+        last_msg = (ChatMessage
+            .select()
+            .where(ChatMessage.session == item.id)
+            .order_by(ChatMessage.created_at.desc())
+            .first())
+        
+        if last_msg.role == 'user' :
+            item.is_done = True
+            item.save()
+
+
+def iddle_task_ai():
     ten_minutes_ago = datetime.now() - timedelta(minutes=10)
     idle_sessions = (
         ChatSession
@@ -140,7 +153,34 @@ def iddle_task():
     )
 
     for item in idle_sessions :
-        user = get_user_by_phone(item.phone)
-        item.is_done = True
-        item.save()
-        # requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': user.jid, 'text': 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊'})
+        last_msg = (ChatMessage
+            .select()
+            .where(ChatMessage.session == item.id)
+            .order_by(ChatMessage.created_at.desc())
+            .first())
+        
+        if last_msg.role == 'user' :
+            item.is_done = True
+            item.save()
+
+            send_end_session(item.phone)
+
+
+def get_active_session(session_in_works):
+    five_second_ago = datetime.now() - timedelta(seconds=5)
+    batch_sessions = (
+        ChatSession
+        .select(
+            ChatSession,
+            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
+        )
+        .where(
+            ( (ChatSession.layanan == 2) | (ChatSession.layanan == 3) ) &
+            (ChatSession.is_done == False) & (ChatSession.id.not_in(session_in_works))
+        )
+        .join(ChatMessage)
+        .group_by(ChatSession)
+        .having(fn.MAX(ChatMessage.created_at) < five_second_ago)
+    )
+
+    return batch_sessions[:(5 - len(session_in_works))]

@@ -1,18 +1,16 @@
 from langgraph.graph import StateGraph, START, END
 
 from graph.state import BPSState
-from graph.nodes.registrasi import registrasi
-from graph.nodes.set_layanan import set_layanan
 from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
-from graph.nodes.complaint import create_ticket
 from graph.nodes.end_checker import end_checker
 from graph.nodes.human_node import human_node
-from graph.nodes.konsultasi import konsultasi
 from graph.state import AnswerModel
 import requests
 import os
 import time
 from dotenv import load_dotenv, find_dotenv
+from typing import List, Dict
+from db.models import get_user_by_phone
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
@@ -25,12 +23,8 @@ def build_graph():
     builder = StateGraph(BPSState)
     # nodes
     
-    builder.add_node("registrasi", registrasi)
-    builder.add_node("set_layanan", set_layanan)
     builder.add_node("end_checker", end_checker)
     builder.add_node("human_node", human_node)
-    builder.add_node("konsultasi", konsultasi)
-    builder.add_node("create_ticket", create_ticket)
 
     builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
@@ -38,18 +32,7 @@ def build_graph():
     builder.add_node("rag_answer", rag_answer)
     
 
-    builder.add_edge(START, "registrasi")
-
-    def followup_registrasi(state):
-        return "set_layanan" if not state["is_done"] else END
-
-    builder.add_conditional_edges("registrasi", followup_registrasi)
-
-    def followup_set_layanan(state):
-        return "end_checker" if not state["is_done"] else END
-
-    builder.add_conditional_edges("set_layanan", followup_set_layanan)
-
+    builder.add_edge(START, "end_checker")
 
     def followup_end_checker(state):
         return "human_node" if not state["is_done"] else END
@@ -58,25 +41,12 @@ def build_graph():
 
     def followup_human_node(state):
         if not state["need_human"] :
-            match  state["layanan_type"] : 
-                case 1 :
-                    return "konsultasi"
-                case 2 :
-                    return "create_ticket"
-                case 3 :
-                    return "pecah_question_and_transform_untuk_rag"
-                case 4 :
-                    return "konsultasi"
-                case _:  # Default case
-                    return END
+            return "pecah_question_and_transform_untuk_rag"
         else :
             return END
 
 
     builder.add_conditional_edges("human_node", followup_human_node)
-
-    builder.add_edge("konsultasi", END)
-    builder.add_edge("create_ticket", END)
 
     builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
     builder.add_edge("rag_search", "rag_validate")
@@ -86,26 +56,21 @@ def build_graph():
     return builder.compile()
    
 
-async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromMe: bool): 
+async def main_chat(graph, session: ChatSession, message: List[str]): 
+    user = get_user_by_phone(session.phone)
 
-    user = get_user_by_phone(state['notelp'])
     state = {
-        "session_id": None,
-        "session_done": False,
-        "layanan_type": 0,
         "need_human": False,
         "is_done": False,
 
-        "nama": name,
-        "nama_lengkap": name,
-        "notelp": phoneNumber,
-        "user_is_db": False,
+        "nama": user.nama,
+        "nama_lengkap": user.nama_lengkap,
+        "notelp": session.phone,
 
         "use_ai": False,
         "question": [],
-        "sis_answer": [],
 
-        "new_chat": text,
+        "new_chat": message,
         "chat_history": [],
     }
 
@@ -121,12 +86,6 @@ async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromM
             ChatMessage.create(
                 session = session,
                 role = "user",
-                content = item_text,
-            )
-        for item_text in result["sis_answer"] :
-            ChatMessage.create(
-                session = session,
-                role = "sis",
                 content = item_text,
             )
         for item_ques in result['question']:
@@ -153,8 +112,6 @@ async def main_chat(graph, phoneNumber: str, name: str, text: list[str], isfromM
         print()
 
     answer = []
-    for item_sis in result['sis_answer']:
-        answer.append(AnswerModel(type="text", text=item_sis))
     for item_ques in result['question']:
         for item_answer in item_ques.answer:
             answer.append(item_answer)

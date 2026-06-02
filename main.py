@@ -1,15 +1,19 @@
-from fastapi import FastAPI, BackgroundTasks
-from pydantic import BaseModel
-from graph.main import main_chat, build_graph
-import asyncio
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from graph.main import build_graph, main_chat
 from dotenv import load_dotenv
-import os
+import asyncio
 from loguru import logger
-from db.models import iddle_task
-from cache import shared_cache
+from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, get_active_session
+from db.model_wablas import WablasIncomingMessage
+import os
+from db.models import get_user_by_phone
+from b_graph.set_layanan import set_layanan
+from b_graph.registrasi import registrasi
+from db.model_wablas import WablasIncomingMessage
+from db.models import WablasIncomingMessage
 
 load_dotenv()
-
 
 if not os.path.exists("log"):
     os.makedirs("log")
@@ -21,106 +25,66 @@ logger.add(
     level="INFO"
 )
 
-
-
 graph = build_graph()
-app = FastAPI()
 
-@app.on_event("startup")
-@repeat_every(seconds=60)
-def iddle_task():
-    asyncio.create_task(iddle_task())
+session_in_works = []
+
+async def debounce_per_user_worker():    
+    while True:
+        await asyncio.sleep(0.5) # Loop cek setiap 1 detik
+        session_to_work = get_active_session(session_in_works)
+        
+        for item in session_to_work : 
+            all_messages = (
+                ChatMessage
+                    .select()
+                    .where(ChatMessage.session == item.id)
+                    .order_by(ChatMessage.created_at)
+            )
+            new_message = []
+            for item_m in all_messages :
+                if item_m.role == "user" :
+                    new_message.append(item_m.content)
+                elif item_m.role == "bot" :
+                    new_message = []
+            asyncio.create_task(main_chat( graph, item, new_message))
+
+async def process_per_minute():    
+    while True:
+        await asyncio.sleep(60) # per menit
+        asyncio.create_task(iddle_task_ai())
+        asyncio.create_task(iddle_task_konsultasi())
+
+# 3. Lifespan Manager (Mengatur startup & shutdown)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    worker_task = asyncio.create_task(debounce_per_user_worker())
+    worker_iddle = asyncio.create_task(process_per_minute())
+    yield
+    worker_task.cancel()
+    worker_iddle.cancel
 
 
-class Param(BaseModel):
-   jid: str
-   phoneNumber: str
-   name: str
-   text: list[str]
-   isfromMe: bool
+app = FastAPI(lifespan=lifespan)
+
+
+
 
 @app.post("/")
-async def read_root(param: Param, bg: BackgroundTasks):
-#     if param.phoneNumber in ['6285283036590'
-# ,'6285234609332'
-# ,'6281218632475'
-# ,'6282122756354'
-# ,'6285241027007'
-# ,'6287731414134'
-# ,'6282195195502'
-# ,'6285299736234'
-# ,'6282191347744'
-# ,'6281212173630'
-# ,'6285255136252'
-# ,'6281244261166'
-# ,'6281311952627'
-# ,'6285242427076'
-# ,'6281342560233'
-# ,'6281342547923'
-# ,'6281256161600'
-# ,'6285338878227'
-# ,'6281341993737'
-# ,'6285242010447'
-# ,'6281343521023'
-# ,'6281342902240'
-# ,'6282210289671'
-# ,'6285340778508'
-# ,'6282259656015'
-# ,'6289618834285'
-# ,'6281384233473'
-# ,'628114002481'
-# ,'6281328253790'
-# ,'6282235078215'
-# ,'6285792017002'
-# ,'6285342419813'
-# ,'6282349063633'
-# ,'6285340886610'
-# ,'6285238809301'
-# ,'6282344852210'
-# ,'6285255178499'
-# ,'6282344852209'
-# ,'6281315546806'
-# ,'6282292278519'
-# ,'6281328747856'
-# ,'6281319069547'
-# ,'6281342774989'
-# ,'6282310324774'
-# ,'6282227397717'
-# ,'6285277397129'
-# ,'6285299230996'
-# ,'628114221767'
-# ,'6281241666770'
-# ,'6281354786929'
-# ,'628982250711'
-# ,'6285395839898'
-# ,'6281241840124'
-# ,'6282292779039'
-# ,'6282311259355'
-# ,'6281258345220'
-# ,'6282343990313'
-# ,'6281399152242'
-# ,'6282214072032'
-# ,'6281218189650'
-# ,'6285726287612'
-# ,'6282394517916'
-# ,'6285157128522'
-# ,'6282196956817'
-# ,'6281227577682'
-# ,'6283115313346'
-# ,'6285280165627'
-# ,'6282297042070'
-# ,'6289650807314'
-# ,'6282191167862'
-# ,'6282210467478'
-# ,'6282319192651'
-# ,'6288224735330']:
-    if param.isfromMe :
-        asyncio.create_task(main_chat( graph, param.jid, param.phoneNumber, param.name, param.text, param.isfromMe))
-        return []
-    else :
-        return []
-    # return main_chat(phoneNumber, name, text, isfromMe)
+async def wablas(message: WablasIncomingMessage):
+    phone = message.phone
+    user = get_user_by_phone(phone)
 
-@app.post("/health_check")
-def health_check():
-    return["a", "b"]
+    session, baru_status, stop = set_layanan(session, baru_status, user, message)
+    if stop :
+        return {"status": True}
+    stop = registrasi(user, message)
+
+    ChatMessage.create(
+        session = session,
+        role = "user",
+        content = message.message,
+    )
+    
+
+    return {"status": True}
