@@ -3,15 +3,12 @@ from langgraph.graph import StateGraph, START, END
 from graph.state import BPSState
 from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
 from graph.nodes.checker import checker
-from graph.nodes.start import start
 from db.model_rag import AnswerModel
-import requests
-import os
-import time
 from dotenv import load_dotenv, find_dotenv
 from typing import List, Dict
 from db.models import get_user_by_phone
 from wablas.send import send_simple_text, send_simple_image
+from loguru import logger
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
@@ -24,7 +21,6 @@ def build_graph():
     builder = StateGraph(BPSState)
     # nodes
     
-    builder.add_node("start", start)
     builder.add_node("checker", checker)
     builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
@@ -32,10 +28,10 @@ def build_graph():
     builder.add_node("rag_answer", rag_answer)
     
 
-    builder.add_edge(START, "start")
+    builder.add_edge(START, "checker")
 
     def followup_checker(state):
-        return "pecah_question_and_transform_untuk_rag" if state["check"] != 'TANYA' else END
+        return "pecah_question_and_transform_untuk_rag" if state["check"] == 'TANYA' else END
 
     builder.add_conditional_edges("checker", followup_checker)
 
@@ -57,7 +53,6 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
         "nama_lengkap": user.nama_lengkap,
         "notelp": session.phone,
 
-        "use_ai": False,
         "question": [],
 
         "new_chat": message,
@@ -104,7 +99,8 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
 
 
 async def main_chat_cmd(graph, text: list[str], chat_history: list[str]): 
-
+    logger.info(text)
+    logger.info(chat_history)
     state = {
         "check": 'TANYA',
 
@@ -112,7 +108,6 @@ async def main_chat_cmd(graph, text: list[str], chat_history: list[str]):
         "nama_lengkap": '',
         "notelp": '',
 
-        "use_ai": False,
         "question": [],
 
         "new_chat": text,
@@ -120,7 +115,7 @@ async def main_chat_cmd(graph, text: list[str], chat_history: list[str]):
     }
 
     result = await graph.ainvoke(state)
-
+    logger.info(result)
     answer = []
     for item_ques in result['question']:
         for item_answer in item_ques.answer:

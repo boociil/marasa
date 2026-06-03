@@ -8,7 +8,7 @@ from graph.main import main_chat_cmd, build_graph
 
 from db.init_db import init_db
 import asyncio
-
+from loguru import logger
 
 async def main():
     parser = argparse.ArgumentParser()
@@ -65,6 +65,7 @@ async def main():
                 
             # 2. Bot Response Logic
             # You can replace this with complex logic or an API call
+            logger.info(user_input)
 
             task = asyncio.create_task(main_chat_cmd(graph, [user_input], chat_history))
             answer = await task 

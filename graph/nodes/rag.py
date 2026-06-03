@@ -14,6 +14,8 @@ from loguru import logger
 load_dotenv(find_dotenv()) 
 
 async def pecah_question_and_transform_untuk_rag(state) :
+    logger.info('pecah_question_and_transform_untuk_rag')
+
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
 
     new_chat = "\n".join(state["new_chat"])
