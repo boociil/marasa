@@ -20,6 +20,7 @@ Judul : {self.title}
 content : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
+Score : {self.score}
 """
 
 class RagData(BaseModel):
@@ -34,6 +35,7 @@ jenis : internal
 Judul : {self.judul}
 content : {self.content}
 Url : {self.url}
+Score : {self.score}
 """
     
 class DDGS(BaseModel):
@@ -57,6 +59,7 @@ class AnswerModel(BaseModel):
 class QuestionModel(BaseModel):
     ques: Optional[str] = None
     rag_ques: list[str] = []
+    keyword: list[str] = []
     answer: list[AnswerModel] = []
     rag_publikasi_brs: list[RagPublikasiBRS] = []
     rag_data: list[RagData] = []

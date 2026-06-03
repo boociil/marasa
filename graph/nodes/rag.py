@@ -14,8 +14,6 @@ from _logger import logger
 load_dotenv(find_dotenv()) 
 
 async def pecah_question_and_transform_untuk_rag(state) :
-    logger.info('pecah_question_and_transform_untuk_rag')
-
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
 
     new_chat = "\n".join(state["new_chat"])
@@ -25,14 +23,23 @@ Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk
 
 Tujuan Anda:
 Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan beberapa variasi kueri pencarian yang dioptimalkan untuk masing-masing pertanyaan tersebut guna memaksimalkan relevansi dokumen (seperti publikasi, tabel statis, atau metadata) yang akan ditarik oleh sistem.
+Tambahkan pula array keyword yang harus ada pada saat query
 
-Aturan Ekstraksi Pertanyaan:
+Optimasi Pertanyaan asli :
+- Jika pertanyaan asli mencari data dan TIDAK ada konteks wilayah, tambahkan kata kunci "Sulawesi Barat".
+- Jika pertanyaan asli mencari data dan TIDAK ada konteks waktu, tambahkan tahun terbaru "2025" dan "2026".
+
+Aturan Ekstraksi Pertanyaan & Kata Kunci:
 - Pertahankan konteks utama pertanyaan.
 - Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
 - Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
 - Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
 - Pertahankan bahasa asli pertanyaan.
 - Gunakan riwayat percakapan untuk melengkapi konteks kalimat, namun abaikan jika tidak relevan dengan teks pengguna saat ini.
+- Ekstrak kata kunci (keyword) utama dari pertanyaan. Setiap item dalam array kata kunci HARUS berupa tepat 1 (satu) kata tunggal. Jika terdapat frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
+- Ekstrak kata kunci (keyword) utama dari pertanyaan. Kata kunci harus berupa istilah substansial yang searchable (seperti nama variabel, indikator, konsep, wilayah, atau entitas).
+- ABAIKAN kata-kata kuantitas, agregasi, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa").
+- usahakan keyword 1 kata
 
 Aturan Optimasi Kueri Pencarian RAG:
 - Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan yang diekstrak.
@@ -56,9 +63,42 @@ Format JSON yang diharapkan:
     "pertanyaan_asli": "Teks pertanyaan yang telah dirapikan",
     "kueri_pencarian": [
       "variasi kueri kata kunci panjang 1",
-      "variasi kueri kata kunci panjang 2 beserta wilayah dan tahun jika data",
-      "variasi kueri kata kunci spesifik 3"
+      "variasi kueri kata kunci panjang 2",
+      "variasi kueri kata kunci spesifik 3",
+      dst..
     ]
+    "keyword": [
+      "keyword 1",
+      "keyword 2",
+      "keyword 3",
+      dst..
+    ]
+  }}
+]
+
+contoh salah:
+[{{'pertanyaan_asli': 'Jumlah x?', 'kueri_pencarian': ['jumlah x Sulawesi Barat 2025 2026', 'total x Sulawesi Barat 2025 2026', 'x Sulawesi Barat 2025 2026'], keyword: [x]}}]
+
+salah kaerana pada dasarnya sama
+
+contoh benar:
+[
+  {{
+    "pertanyaan_asli": "data TPAK dan persentase kemiskinan",
+    "kueri_pencarian": [
+      "Tingkat Partisipasi Angkatan Kerja TPAK Sulawesi Barat 2025 2026",
+      "persentase penduduk miskin kemiskinan Sulawesi Barat 2025 2026"
+    ],
+    keyword: ['TPAK', 'kemiskinan']
+  }},
+  {{
+    "pertanyaan_asli": "hubungannya data TPAK dan persentase kemiskinan dengan pertumbuhan ekonomi",
+    "kueri_pencarian": [
+      "Tingkat Partisipasi Angkatan Kerja TPAK dengan pertumbuhan ekonomi",
+      "persentase kemiskinan terhadap pertumbuhan ekonomi",
+      "hubungannya data TPAK dan persentase kemiskinan"
+    ]
+    keyword: ['TPAK', 'pertumbuhan ekonomi']
   }}
 ]
 
@@ -88,6 +128,12 @@ Teks Pengguna:
                                 "items": {
                                     "type": "string"
                                 },
+                            },
+                            "keyword": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
                             }
                         },
                     }
@@ -100,16 +146,22 @@ Teks Pengguna:
     logger.info(extract_rag_json)
     ques_arr = []
     for item in extract_rag_json:
-        ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=item['kueri_pencarian']))
+        kueri_pencarian = []
+        for item_kuri in item['kueri_pencarian']:
+            if item_kuri.strip() != "" :
+                kueri_pencarian.append(item_kuri.strip())
+        ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=kueri_pencarian, keyword=item['keyword']))
     state["question"] = ques_arr
     return state
 
 async def rag_search(state):
     for index, item in enumerate(state['question']) :
         query = state["question"][index].rag_ques
+        keywords = state["question"][index].keyword
 
         search = DuckDuckGoSearchResults(output_format="list")
-        results_list = search.invoke(f"site:bps.go.id {state['question'][index].ques}")
+        logger.info(f"site:bps.go.id {', '.join(query)}")
+        results_list = search.invoke(f"site:bps.go.id {', '.join(query)}")
 
         for res in results_list:
             state["question"][index].ddgs.append(
@@ -122,6 +174,7 @@ async def rag_search(state):
             )
 
         docs_pdf = get_rag_data_arr(query, 5)
+        sorce_page_unique = []
         for doc, _score in docs_pdf:
             bps_id = ""
             type = ""
@@ -132,30 +185,37 @@ async def rag_search(state):
                 bps_id = doc.metadata['brs_id']
                 type = 'brs'
             
-            state["question"][index].rag_publikasi_brs.append(
-                RagPublikasiBRS( 
-                    id = str(uuid.uuid4()),
-                    bps_id = bps_id,
-                    type = type,
-                    title = doc.metadata['title'], 
-                    halaman= int(doc.id.split(':')[-2])+1, 
-                    content = doc.page_content if doc.id.split(':')[-1] == '0' else get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
-                    rl_date = doc.metadata['rl_date'], 
-                    score= _score
-                )
-            )
+            source_page = f"{doc.metadata['source'] } -+- {doc.metadata['page']}"
+            text = doc.page_content
+            if any(keyword.lower() in text.lower() for keyword in keywords):
+                if source_page not in sorce_page_unique :
+                    state["question"][index].rag_publikasi_brs.append(
+                        RagPublikasiBRS( 
+                            id = str(uuid.uuid4()),
+                            bps_id = bps_id,
+                            type = type,
+                            title = doc.metadata['title'], 
+                            halaman= int(doc.id.split(':')[-2])+1, 
+                            content = get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
+                            rl_date = doc.metadata['rl_date'], 
+                            score= _score
+                        )
+                    )
+                    sorce_page_unique.append(source_page)
 
         docs_table = get_rag_data_table_arr(query, 5)
         for doc, _score in docs_table:
-            state["question"][index].rag_data.append(
-                RagData( 
-                    id = str(uuid.uuid4()),
-                    judul = doc.metadata['judul'], 
-                    url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
-                    content = doc.page_content, 
-                    score= _score
+            text = doc.page_content
+            if any(keyword.lower() in text.lower() for keyword in keywords):
+                state["question"][index].rag_data.append(
+                    RagData( 
+                        id = str(uuid.uuid4()),
+                        judul = doc.metadata['judul'], 
+                        url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
+                        content = doc.page_content, 
+                        score= _score
+                    )
                 )
-            )
     return state
 
 async def rag_rerank(state):
@@ -169,7 +229,7 @@ async def rag_rerank(state):
             chunks += item.print() +'\n\n'
         for item in state["question"][index].ddgs :
             chunks += item.print() +'\n\n'
-
+        logger.info(chunks)
         prompt =f""""
 Kamu adalah penilai relevansi dokumen untuk sistem RAG.
 

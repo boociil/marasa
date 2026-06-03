@@ -115,7 +115,6 @@ async def main_chat_cmd(graph, text: list[str], chat_history: list[str]):
     }
 
     result = await graph.ainvoke(state)
-    logger.info(result)
     answer = []
     for item_ques in result['question']:
         for item_answer in item_ques.answer:
