@@ -1,4 +1,4 @@
-from graph.rag.retriever import get_rag_data, get_rag_data_arr, get_rag_data_table, get_rag_data_table_arr
+from graph.rag.retriever import  get_rag_data_arr, get_content_rag_data_by_halaman, get_rag_data_table_arr
 from graph.text import LLM_PROMPT
 from graph.llm import llm_query, llm_query_answer
 from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
@@ -9,7 +9,7 @@ import json
 import unicodedata
 from google.genai.types import Tool, GenerateContentConfig
 from langchain_community.tools import DuckDuckGoSearchResults
-from loguru import logger
+from _logger import logger
 
 load_dotenv(find_dotenv()) 
 
@@ -24,32 +24,26 @@ async def pecah_question_and_transform_untuk_rag(state) :
 Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
 
 Tujuan Anda:
-Analisis teks yang diberikan (mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan beberapa variasi kueri pencarian yang dioptimalkan untuk masing-masing pertanyaan tersebut guna memaksimalkan relevansi dokumen (seperti publikasi, tabel statis, atau metadata) yang akan ditarik.
+Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan beberapa variasi kueri pencarian yang dioptimalkan untuk masing-masing pertanyaan tersebut guna memaksimalkan relevansi dokumen (seperti publikasi, tabel statis, atau metadata) yang akan ditarik oleh sistem.
 
 Aturan Ekstraksi Pertanyaan:
-- Jangan kehilangan konteks utama pertanyaan
-- Pertanyaan bisa tampa tanda ? / tanya
-- Tanpa penjelasan, kecual jika sebagai konteks utama pertanyaan.
-- Tidak boleh ada teks tambahan.
-- Pertahankan bahasa asli.
-- Hapus duplikat.
-- Jika beberapa pertanyaan dapat digabung, maka gabung
-- perhatikan Riwayat percakapan namun kalo tidak relevan hilangkan
-
+- Pertahankan konteks utama pertanyaan.
+- Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
+- Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
+- Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
+- Pertahankan bahasa asli pertanyaan.
+- Gunakan riwayat percakapan untuk melengkapi konteks kalimat, namun abaikan jika tidak relevan dengan teks pengguna saat ini.
 
 Aturan Optimasi Kueri Pencarian RAG:
-- Buat minimal 1  kueri pencarian yang mandiri (standalone) untuk setiap pertanyaan yang diekstrak
-- lebih dari 1 kuari pencarian jika ada beberapa indikator yang dicari (misalnya hubunggan variabel a dan b, maka masing-masing a dan b)
-- Pertahankan bahasa asli
-- Jangan kehilangan konteks utama
-- Perluas konteks dan kata kunci
-- Buat agar mandiri
-- Hapus kata-kata percakapan
-- JANGAN menjawab pertanyaan
-- Jumlah hasil harus sama dengan jumlah pertanyaan
-- Jangan memperbanyak pertanyaan
-- Jika menayakan data dan tidak ada konteks wilayah tambahkan sulawesi barat
-- Jika menayakan data dan tidak ada konteks waktu maka tambahkan waktu terbaru (2025, 2026)
+- Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan yang diekstrak.
+- Buat lebih dari 1 kueri pencarian jika ada beberapa indikator yang dicari (Misal: jika mencari "hubungan variabel A dan B", buat kueri untuk A, kueri untuk B, dan kueri untuk hubungan keduanya).
+- Pertahankan bahasa asli.
+- Perluas kata kunci (gunakan sinonim atau kepanjangan dari singkatan, misal: TPAK menjadi Tingkat Partisipasi Angkatan Kerja).
+- Hapus kata-kata percakapan atau basa-basi (seperti "tolong", "halo", "carikan").
+- Kueri harus mandiri (tidak bergantung pada referensi kata ganti seperti "itu" atau "dia").
+- JANGAN mencoba menjawab pertanyaan, Anda hanya bertugas membuat kueri.
+- Jika pertanyaan mencari data dan TIDAK ada konteks wilayah, tambahkan kata kunci "Sulawesi Barat".
+- Jika pertanyaan mencari data dan TIDAK ada konteks waktu, tambahkan tahun terbaru "2025" dan "2026".
 
 Aturan Output (SANGAT KETAT):
 - Anda HANYA boleh merespons dalam format array JSON yang valid.
@@ -115,7 +109,7 @@ async def rag_search(state):
         query = state["question"][index].rag_ques
 
         search = DuckDuckGoSearchResults(output_format="list")
-        results_list = search.invoke(state["question"][index].ques)
+        results_list = search.invoke(f"site:bps.go.id {state['question'][index].ques}")
 
         for res in results_list:
             state["question"][index].ddgs.append(
@@ -145,7 +139,7 @@ async def rag_search(state):
                     type = type,
                     title = doc.metadata['title'], 
                     halaman= int(doc.id.split(':')[-2])+1, 
-                    content = doc.page_content, 
+                    content = doc.page_content if doc.id.split(':')[-1] == '0' else get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
                     rl_date = doc.metadata['rl_date'], 
                     score= _score
                 )
@@ -164,7 +158,7 @@ async def rag_search(state):
             )
     return state
 
-async def rag_validate(state):
+async def rag_rerank(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
         chunks = ""

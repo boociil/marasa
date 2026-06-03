@@ -8,20 +8,20 @@ def get_rag_data_arr(query_text_arr, k_=10):
         results_arr.extend(results)
     return results_arr
 
-def get_rag_data(query_text, k_=10):
+def get_content_rag_data_by_halaman(source, page):
     db = get_vectorstore_pdf()
+    result = db.get(where={
+        "$and": [
+            {"source": source},
+            {"page": page}
+        ]
+    } )
 
-    results = db.similarity_search_with_score(query_text, k=k_)
-    return results
-    # results = db.imilarity_search_with_score(query_text, k=10)
+    content_full = ""
+    for item in result : 
+        content_full +="\n"+item.page_content
+    return content_full
 
-    # filtered_docs_with_scores = [
-    #     (doc, score) 
-    #     for doc, score in results
-    #     if score <= 0.75
-    # ]
-
-    # return filtered_docs_with_scores
 
 def get_rag_data_table_arr(query_text_arr, k_=10):
     db = get_vectorstore_table()
@@ -30,19 +30,3 @@ def get_rag_data_table_arr(query_text_arr, k_=10):
         results = db.similarity_search_with_score(item_query, k=k_)
         results_arr.extend(results)
     return results_arr
-
-
-def get_rag_data_table(query_text, k_=10):
-    db = get_vectorstore_table()
-
-    results = db.similarity_search_with_score(query_text, k=k_)
-    return results
-    # results = db.imilarity_search_with_score(query_text, k=10)
-
-    # filtered_docs_with_scores = [
-    #     (doc, score) 
-    #     for doc, score in results
-    #     if score <= 0.75
-    # ]
-
-    # return filtered_docs_with_scores

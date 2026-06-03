@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class RagPublikasiBRS(BaseModel):
     id: str
@@ -12,11 +13,13 @@ class RagPublikasiBRS(BaseModel):
     rl_date: str
     score: float
     def print(self):
+        rl_date_split = self.rl_date.split("-")
         return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
 content : {self.content}
 Release : {self.rl_date}
+Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 """
 
 class RagData(BaseModel):

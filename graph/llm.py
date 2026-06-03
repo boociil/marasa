@@ -3,7 +3,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from google import genai
 import asyncio
-from loguru import logger
+from _logger import logger
 
 load_dotenv(find_dotenv()) 
 

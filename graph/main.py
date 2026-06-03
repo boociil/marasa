@@ -1,14 +1,14 @@
 from langgraph.graph import StateGraph, START, END
 
 from graph.state import BPSState
-from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
+from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_rerank, rag_answer
 from graph.nodes.checker import checker
 from db.model_rag import AnswerModel
 from dotenv import load_dotenv, find_dotenv
 from typing import List, Dict
 from db.models import get_user_by_phone
 from wablas.send import send_simple_text, send_simple_image
-from loguru import logger
+from _logger import logger
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
@@ -24,7 +24,7 @@ def build_graph():
     builder.add_node("checker", checker)
     builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
-    builder.add_node("rag_validate", rag_validate)
+    builder.add_node("rag_rerank", rag_rerank)
     builder.add_node("rag_answer", rag_answer)
     
 
@@ -36,8 +36,8 @@ def build_graph():
     builder.add_conditional_edges("checker", followup_checker)
 
     builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
-    builder.add_edge("rag_search", "rag_validate")
-    builder.add_edge("rag_validate", "rag_answer")
+    builder.add_edge("rag_search", "rag_rerank")
+    builder.add_edge("rag_rerank", "rag_answer")
     builder.add_edge("rag_answer", END)
 
     return builder.compile()

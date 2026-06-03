@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from graph.main import build_graph, main_chat
 from dotenv import load_dotenv
 import asyncio
-from loguru import logger
+from _logger import logger
 from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, get_active_session, close_24_hour
 from db.model_wablas import WablasIncomingMessage
 import os

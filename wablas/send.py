@@ -3,7 +3,7 @@ import mimetypes
 import os
 import base64
 from dotenv import load_dotenv, find_dotenv
-from loguru import logger
+from _logger import logger
 
 load_dotenv(find_dotenv())
 
