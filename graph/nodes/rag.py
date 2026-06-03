@@ -1,7 +1,7 @@
 from graph.rag.retriever import get_rag_data, get_rag_data_arr, get_rag_data_table, get_rag_data_table_arr
 from graph.text import LLM_PROMPT
 from graph.llm import llm_query, llm_query_answer
-from graph.state import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
+from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
 from dotenv import load_dotenv, find_dotenv
 import os
 import uuid

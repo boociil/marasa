@@ -11,7 +11,7 @@ class User(BaseModel):
     pekerjaan = CharField(max_length=255, null=True)
     instansi = CharField(max_length=255, null=True)
     tahun_lahir = IntegerField()
-    created_at = DateTimeField(default=datetime.datetime.now)
+    created_at = DateTimeField(default=datetime.now)
 
 class ChatSession(BaseModel):
     phone = CharField(max_length=15)
@@ -19,21 +19,21 @@ class ChatSession(BaseModel):
     use_ai = BooleanField(default=False)
     is_done = BooleanField(default=False)
     need_human = BooleanField(default=False)
-    created_at = DateTimeField(default=datetime.datetime.now)
-    updated_at = DateTimeField(default=datetime.datetime.now)
+    created_at = DateTimeField(default=datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
 
 
 class ChatMessage(BaseModel):
     session = ForeignKeyField(ChatSession, backref="messages", null=True)
     role = CharField(max_length=10)   # user / bot / sis
     content = TextField()
-    created_at = DateTimeField(default=datetime.datetime.now)
+    created_at = DateTimeField(default=datetime.now)
 
 
 class Ticket(BaseModel):
     user = ForeignKeyField(User, field='notelp', backref='ticket')
     content = TextField()
-    created_at = DateTimeField(default=datetime.datetime.now)
+    created_at = DateTimeField(default=datetime.now)
 
 
 SESSION_TTL_HOURS = 24
@@ -184,3 +184,25 @@ def get_active_session(session_in_works):
     )
 
     return batch_sessions[:(5 - len(session_in_works))]
+
+def close_24_hour():
+    twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
+
+    sessions_to_close = (
+        ChatSession
+        .select(ChatSession.id)
+        .join(ChatMessage)
+        .where(ChatSession.is_done == False)
+        .group_by(ChatSession)
+        .having(fn.MAX(ChatMessage.created_at) < twenty_four_hours_ago)
+    )
+
+    update_query = (
+        ChatSession
+        .update(is_done=True)
+        .where(ChatSession.id.in_(sessions_to_close))
+    )
+
+    rows_updated = update_query.execute()
+
+    print(f"Berhasil menutup {rows_updated} sesi chat yang idle selama 24 jam.")

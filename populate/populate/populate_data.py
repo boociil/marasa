@@ -1,7 +1,7 @@
 import os
 import requests
 from langchain_core.documents import Document
-from src.get_embedding_function import get_embedding_function
+from populate.get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
 import os, re, time
 from dotenv import load_dotenv, find_dotenv

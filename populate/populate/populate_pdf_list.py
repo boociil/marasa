@@ -1,6 +1,6 @@
 import os
 from langchain_core.documents import Document
-from src.get_embedding_function import get_embedding_function
+from populate.get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
 from dotenv import load_dotenv, find_dotenv
 import os

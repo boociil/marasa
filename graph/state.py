@@ -1,11 +1,9 @@
-from typing import TypedDict, List, Optional
-from typing import Optional
+from typing import TypedDict, List
 
 from db.model_rag import QuestionModel, ChatMessage
 
 class BPSState(TypedDict):
-    need_human: bool
-    is_done: bool
+    check: str
     
     nama: str
     notelp: str

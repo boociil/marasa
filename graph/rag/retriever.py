@@ -1,4 +1,4 @@
-from src.graph.rag.chroma_client import get_vectorstore_pdf, get_vectorstore_table
+from graph.rag.chroma_client import get_vectorstore_pdf, get_vectorstore_table
 
 def get_rag_data_arr(query_text_arr, k_=10):
     db = get_vectorstore_pdf()

@@ -66,7 +66,9 @@ async def main():
             # 2. Bot Response Logic
             # You can replace this with complex logic or an API call
 
-            answer =  main_chat_cmd(graph, [user_input], chat_history)
+            task = asyncio.create_task(main_chat_cmd(graph, [user_input], chat_history))
+            answer = await task 
+            
             chat_history.append("user :"+user_input)
             for item_answer in answer:
                 if item_answer.file_path is None :

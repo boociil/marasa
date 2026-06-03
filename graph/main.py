@@ -2,15 +2,16 @@ from langgraph.graph import StateGraph, START, END
 
 from graph.state import BPSState
 from graph.nodes.rag import pecah_question_and_transform_untuk_rag, rag_search, rag_validate, rag_answer
-from graph.nodes.end_checker import end_checker
-from graph.nodes.human_node import human_node
-from graph.state import AnswerModel
+from graph.nodes.checker import checker
+from graph.nodes.start import start
+from db.model_rag import AnswerModel
 import requests
 import os
 import time
 from dotenv import load_dotenv, find_dotenv
 from typing import List, Dict
 from db.models import get_user_by_phone
+from wablas.send import send_simple_text, send_simple_image
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
@@ -23,30 +24,20 @@ def build_graph():
     builder = StateGraph(BPSState)
     # nodes
     
-    builder.add_node("end_checker", end_checker)
-    builder.add_node("human_node", human_node)
-
+    builder.add_node("start", start)
+    builder.add_node("checker", checker)
     builder.add_node("pecah_question_and_transform_untuk_rag", pecah_question_and_transform_untuk_rag)
     builder.add_node("rag_search", rag_search)
     builder.add_node("rag_validate", rag_validate)
     builder.add_node("rag_answer", rag_answer)
     
 
-    builder.add_edge(START, "end_checker")
+    builder.add_edge(START, "start")
 
-    def followup_end_checker(state):
-        return "human_node" if not state["is_done"] else END
+    def followup_checker(state):
+        return "pecah_question_and_transform_untuk_rag" if state["check"] != 'TANYA' else END
 
-    builder.add_conditional_edges("end_checker", followup_end_checker)
-
-    def followup_human_node(state):
-        if not state["need_human"] :
-            return "pecah_question_and_transform_untuk_rag"
-        else :
-            return END
-
-
-    builder.add_conditional_edges("human_node", followup_human_node)
+    builder.add_conditional_edges("checker", followup_checker)
 
     builder.add_edge("pecah_question_and_transform_untuk_rag", "rag_search")
     builder.add_edge("rag_search", "rag_validate")
@@ -60,8 +51,7 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
     user = get_user_by_phone(session.phone)
 
     state = {
-        "need_human": False,
-        "is_done": False,
+        "check": 'TANYA',
 
         "nama": user.nama,
         "nama_lengkap": user.nama_lengkap,
@@ -76,41 +66,24 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
 
     
     result = await graph.ainvoke(state)
-    
-    try:
-        session = ChatSession.get_by_id(result['session_id'])
-        if session.is_done and result['user_is_db']: 
-            return []
 
-        for item_text in result["new_chat"] :
-            ChatMessage.create(
-                session = session,
-                role = "user",
-                content = item_text,
-            )
-        for item_ques in result['question']:
-            for item_answer in item_ques.answer:
-                if item_answer.file_path is None :
-                    ChatMessage.create(
-                        session = session,
-                        role = "sis",
-                        content = item_answer.text,
-                    )
-                else :
-                    ChatMessage.create(
-                        session = session,
-                        role = "sis",
-                        content = item_answer.file_path,
-                    )
-        session.use_ai = result['use_ai']
-        session.is_done = result['session_done']
-        session.need_human = result['need_human']
-        if result['need_human'] == True :
-            session.is_done = True
+    if result['check'] == 'PUAS' :
+        send_simple_text(user.notelp, 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊')
+        session.is_done = True;
         session.save()
-    except ChatSession.DoesNotExist:
-        print()
-
+        return
+    elif result['check'] == 'ADMIN' :
+        send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
+        session.is_done = True;
+        session.save()
+        return
+    elif  result['check'] == 'OFF' :
+        send_simple_text(user.notelp, 'Waduh, maaf banget nih, sepertinya pertanyaan tadi di luar topik statistik BPS. Yuk, kita kembali ke jalur utama!')
+        session.is_done = True;
+        session.save()
+        return
+    #TANYA
+ 
     answer = []
     for item_ques in result['question']:
         for item_answer in item_ques.answer:
@@ -122,16 +95,10 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
     path_ori = []
     for item_answer in answer:
         if item_answer.file_path is None :
-            requests.post(os.getenv('URL_JS')+"/send-message", json={'jid': jid, 'text': item_answer.text})
+            send_simple_text(user.notelp, item_answer.text)
         else :
             if item_answer.file_path not in path_ori :
-                with open(item_answer.file_path, 'rb') as f:
-                    # FORMAT: (filename, file_object, mimetype)
-                    files = {
-                        'image': ('image.jpg', f, 'image/jpeg') 
-                    }
-                    
-                    requests.post(os.getenv('URL_JS')+"/send-message", data={'jid': jid, 'text': item_answer.text}, files=files)
+                send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
                 path_ori.append(item_answer.file_path)
     
 
@@ -139,21 +106,17 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
 async def main_chat_cmd(graph, text: list[str], chat_history: list[str]): 
 
     state = {
-        "session_id": None,
-        "session_done": False,
-        "layanan_type": 0,
-        "need_human": False,
-        "is_done": False,
+        "check": 'TANYA',
 
-        "jid": "jid",
-        "nama": "name",
-        "notelp": "notelp",
+        "nama": '',
+        "nama_lengkap": '',
+        "notelp": '',
 
         "use_ai": False,
         "question": [],
 
         "new_chat": text,
-        "chat_history": [],
+        "chat_history": chat_history,
     }
 
     result = await graph.ainvoke(state)

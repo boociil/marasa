@@ -3,7 +3,7 @@ from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
 from loguru import logger
 from db.model_wablas import WablasIncomingMessage
-from db.models import WablasIncomingMessage, User
+from db.models import User
 from typing import Tuple
 from wablas.send import send_simple_text
 

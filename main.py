@@ -4,14 +4,12 @@ from graph.main import build_graph, main_chat
 from dotenv import load_dotenv
 import asyncio
 from loguru import logger
-from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, get_active_session
+from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, get_active_session, close_24_hour
 from db.model_wablas import WablasIncomingMessage
 import os
 from db.models import get_user_by_phone
 from b_graph.set_layanan import set_layanan
 from b_graph.registrasi import registrasi
-from db.model_wablas import WablasIncomingMessage
-from db.models import WablasIncomingMessage
 
 load_dotenv()
 
@@ -25,9 +23,12 @@ logger.add(
     level="INFO"
 )
 
+close_24_hour()
 graph = build_graph()
-
 session_in_works = []
+
+def on_finish_callback(id_session: str) :
+    session_in_works.remove(id_session)
 
 async def debounce_per_user_worker():    
     while True:
@@ -47,7 +48,9 @@ async def debounce_per_user_worker():
                     new_message.append(item_m.content)
                 elif item_m.role == "bot" :
                     new_message = []
-            asyncio.create_task(main_chat( graph, item, new_message))
+            task = asyncio.create_task(main_chat( graph, item, new_message))
+            task.add_done_callback(lambda t: on_finish_callback(item.id, t))
+            session_in_works
 
 async def process_per_minute():    
     while True:

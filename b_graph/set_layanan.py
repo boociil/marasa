@@ -2,7 +2,7 @@ from db.models import get_or_create_active_session
 from wablas.send import send_menu, send_simple_text
 from cache import shared_cache
 from db.model_wablas import WablasIncomingMessage
-from db.models import WablasIncomingMessage, ChatSession, User
+from db.models import ChatSession, User
 from typing import Tuple
 from b_graph.check_working import check_work_status
 
