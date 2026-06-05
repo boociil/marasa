@@ -1,7 +1,7 @@
 import re
 from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
-from _logger import logger
+from _global import logger
 from db.model_wablas import WablasIncomingMessage
 from db.models import User
 from typing import Tuple

@@ -7,9 +7,8 @@ import os
 import uuid
 import json
 import unicodedata
-from google.genai.types import Tool, GenerateContentConfig
 from langchain_community.tools import DuckDuckGoSearchResults
-from _logger import logger
+from _global import logger
 
 load_dotenv(find_dotenv()) 
 
@@ -161,7 +160,7 @@ async def rag_search(state):
 
         search = DuckDuckGoSearchResults(output_format="list")
         logger.info(f"site:bps.go.id {', '.join(query)}")
-        results_list = search.invoke(f"site:bps.go.id {', '.join(query)}")
+        results_list = await search.ainvoke(f"site:bps.go.id {', '.join(query)}")
 
         for res in results_list:
             state["question"][index].ddgs.append(
@@ -173,7 +172,7 @@ async def rag_search(state):
                 )
             )
 
-        docs_pdf = get_rag_data_arr(query, 5)
+        docs_pdf = await get_rag_data_arr(query, 5)
         sorce_page_unique = []
         for doc, _score in docs_pdf:
             bps_id = ""
@@ -196,14 +195,14 @@ async def rag_search(state):
                             type = type,
                             title = doc.metadata['title'], 
                             halaman= int(doc.id.split(':')[-2])+1, 
-                            content = get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
+                            content = await get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
                             rl_date = doc.metadata['rl_date'], 
                             score= _score
                         )
                     )
                     sorce_page_unique.append(source_page)
 
-        docs_table = get_rag_data_table_arr(query, 5)
+        docs_table = await get_rag_data_table_arr(query, 5)
         for doc, _score in docs_table:
             text = doc.page_content
             if any(keyword.lower() in text.lower() for keyword in keywords):
@@ -256,7 +255,6 @@ Pertanyaan:
 Daftar knowledge chunks:
 {chunks}"""
         
-        # print(prompt)
         id_keep_rag =[]
         while True:
             try :

@@ -3,17 +3,10 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from google import genai
 import asyncio
-from _logger import logger
+from _global import logger
+import asyncio
 
 load_dotenv(find_dotenv()) 
-
-async def llm_query_local(prompt: str, api_key):
-    # model = OllamaLLM(model="gemma2:2b")
-    
-    model = OllamaLLM(model=os.getenv("LLM_MODEL"))
-    response_text = model.invoke(prompt)
-    return response_text
-
 
 async def llm_query(prompt: str, api_key_s, config) :
     client = genai.Client(api_key=api_key_s)
@@ -23,7 +16,7 @@ async def llm_query(prompt: str, api_key_s, config) :
         try:
             model = "gemma-4-31b-it"
     
-            response = client.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=model, contents=prompt, config=config
             )
             if response and response.text:
@@ -44,7 +37,7 @@ async def llm_query_answer(prompt: str, api_key_s) :
     while True:
         try:
             model = "gemma-4-31b-it"
-            response = client.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=model, contents=prompt
             )
             if response and response.text:

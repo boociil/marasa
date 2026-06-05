@@ -1,6 +1,6 @@
-from peewee import *
 import os
 from dotenv import load_dotenv, find_dotenv
+from peewee_async import MySQLDatabase, AioModel
 
 load_dotenv(find_dotenv()) 
 
@@ -12,6 +12,6 @@ db = MySQLDatabase(
     port=int(os.getenv('DB_PORT'))
 )
 
-class BaseModel(Model):
+class BaseModel(AioModel):
     class Meta:
         database = db

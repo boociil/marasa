@@ -1,5 +1,5 @@
 from db.models import User, ChatSession, ChatMessage, Ticket
-from peewee import *
+from peewee_async import MySQLDatabase
 import os
 from dotenv import load_dotenv, find_dotenv
 

@@ -1,7 +1,7 @@
 from dotenv import load_dotenv, find_dotenv
 from graph.llm import llm_query
 import os
-from _logger import logger
+from _global import logger
 
 load_dotenv(find_dotenv()) 
 

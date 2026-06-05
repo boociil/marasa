@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from graph.main import build_graph, main_chat
 from dotenv import load_dotenv
 import asyncio
-from _logger import logger
+from _global import logger
 from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, get_active_session, close_24_hour
 from db.model_wablas import WablasIncomingMessage
 import os
@@ -23,17 +23,17 @@ logger.add(
     level="INFO"
 )
 
-close_24_hour()
 graph = build_graph()
-session_in_works = []
+session_in_works = set()
 
 def on_finish_callback(id_session: str) :
-    session_in_works.remove(id_session)
+    if id_session in session_in_works:
+        session_in_works.discard(id_session)
 
 async def debounce_per_user_worker():    
     while True:
         await asyncio.sleep(0.5) # Loop cek setiap 1 detik
-        session_to_work = get_active_session(session_in_works)
+        session_to_work = get_active_session(list(session_in_works))
         
         for item in session_to_work : 
             all_messages = (
@@ -48,9 +48,12 @@ async def debounce_per_user_worker():
                     new_message.append(item_m.content)
                 elif item_m.role == "bot" :
                     new_message = []
+            session_id = item.id
+            session_in_works.add(session_id)
             task = asyncio.create_task(main_chat( graph, item, new_message))
-            task.add_done_callback(lambda t: on_finish_callback(item.id, t))
-            session_in_works
+            task.add_done_callback(
+                lambda t, session_id=session_id: on_finish_callback(session_id)
+            )
 
 async def process_per_minute():    
     while True:
@@ -61,11 +64,13 @@ async def process_per_minute():
 # 3. Lifespan Manager (Mengatur startup & shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    close_24_hour()
+    
     worker_task = asyncio.create_task(debounce_per_user_worker())
     worker_iddle = asyncio.create_task(process_per_minute())
     yield
     worker_task.cancel()
-    worker_iddle.cancel
+    worker_iddle.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -78,10 +83,12 @@ async def wablas(message: WablasIncomingMessage):
     phone = message.phone
     user = get_user_by_phone(phone)
 
-    session, baru_status, stop = set_layanan(session, baru_status, user, message)
+    session, baru_status, stop = set_layanan(user, message)
     if stop :
         return {"status": True}
     stop = registrasi(user, message)
+    if stop :
+        return {"status": True}
 
     ChatMessage.create(
         session = session,

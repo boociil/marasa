@@ -8,7 +8,7 @@ from graph.main import main_chat_cmd, build_graph
 
 from db.init_db import init_db
 import asyncio
-from _logger import logger
+from _global import logger
 
 async def main():
     parser = argparse.ArgumentParser()

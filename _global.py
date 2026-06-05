@@ -1,0 +1,27 @@
+from langchain_chroma import Chroma
+from populate.get_embedding_function import get_embedding_function
+from dotenv import load_dotenv, find_dotenv
+import os
+from loguru import logger
+from diskcache import Cache
+
+
+load_dotenv(find_dotenv()) 
+
+def get_vectorstore_pdf():
+    return Chroma(persist_directory=os.getenv('CHROMA_PATH_ISI_PDF'), embedding_function=get_embedding_function())
+
+def get_vectorstore_table():
+    return Chroma(persist_directory=os.getenv('CHROMA_PATH_TABLE'), embedding_function=get_embedding_function())
+
+vectorstore_isi_pdf = get_vectorstore_pdf()
+vectorstore_table = get_vectorstore_table()
+
+logger.add(
+    "log/api_{time:YYYY-MM-DD}.log", # Nama file akan jadi seperti log/api_2026-05-26.log
+    rotation="00:00",                # Buat file baru setiap jam 12 malam (tengah malam)
+    retention="30 days",             # Opsional: Otomatis hapus file log yang lebih tua dari 30 hari
+    level="INFO"
+)
+
+shared_cache = Cache("cache/share")

@@ -8,7 +8,7 @@ from dotenv import load_dotenv, find_dotenv
 from typing import List, Dict
 from db.models import get_user_by_phone
 from wablas.send import send_simple_text, send_simple_image
-from _logger import logger
+from _global import logger
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())

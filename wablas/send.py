@@ -1,16 +1,16 @@
-import requests
 import mimetypes
 import os
 import base64
 from dotenv import load_dotenv, find_dotenv
-from _logger import logger
+from _global import logger
+import httpx
 
 load_dotenv(find_dotenv())
 
 TOKEN = os.getenv('WABLAS_TOKEN')
 SECRET_KEY =  os.getenv('WABLAS_SECRET_KEY')
 
-def send_simple_text(phone: str, message:str) :
+async def send_simple_text(phone: str, message:str) :
     flag = "instant"  # Optional: Enable extended message processing
 
     # Combine token and secret key exactly as in the PHP script
@@ -25,13 +25,21 @@ def send_simple_text(phone: str, message:str) :
         "flag": flag
     }
 
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        logger.info(f"Request failed: {e}")
+    while True:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                
+                # (Opsional) return response jika berhasil
+                break
+                
+            except httpx.HTTPError as e:
+                # httpx.HTTPError menangkap semua error terkait request dan HTTP status
+                logger.info(f"Request failed: {e}")
+                return None
 
-def send_simple_image(phone: str, caption:str, file_path: str) :
+async def send_simple_image(phone: str, caption:str, file_path: str) :
 
     # Gather file metadata to simulate PHP's $_FILES array
     filename = os.path.basename(file_path)
@@ -66,19 +74,21 @@ def send_simple_image(phone: str, caption:str, file_path: str) :
 
     url = "https://tegal.wablas.com/api/send-image-from-local"
 
-    try:
-        # 5. Execute the POST request
-        # verify=False is equivalent to CURLOPT_SSL_VERIFYHOST and VERIFYPEER = 0
-        response = requests.post(url, headers=headers, data=params)
-        response.raise_for_status()
+    while True:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                
+                # (Opsional) return response jika berhasil
+                break
+                
+            except httpx.HTTPError as e:
+                # httpx.HTTPError menangkap semua error terkait request dan HTTP status
+                logger.info(f"Request failed: {e}")
 
-    except FileNotFoundError:
-        logger.info(f"Error: The file at {file_path} was not found.")
-    except requests.exceptions.RequestException as e:
-        logger.info(f"Request failed: {e}")
 
-
-def send_menu(phone: str, work_status, nama_lengkap) :
+async def send_menu(phone: str, work_status, nama_lengkap) :
     url = "https://tegal.wablas.com/api/v2/send-list"
 
     if work_status : 
@@ -151,18 +161,20 @@ def send_menu(phone: str, work_status, nama_lengkap) :
         "Content-Type": "application/json"
     }
 
-    try:
-        # Menggunakan parameter 'json=payload' otomatis mengubah dictionary ke string JSON
-        # verify=False digunakan karena di PHP Anda menggunakan CURLOPT_SSL_VERIFYPEER = 0
-        response = requests.post(url, headers=headers, json=payload, verify=False)
-        
-        # Menampilkan hasil response
-        print(response.text)
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Terjadi kesalahan pada request: {e}")
+    while True:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, headers=headers, json=payload, verify=False)
+                response.raise_for_status()
+                
+                # (Opsional) return response jika berhasil
+                break
+                
+            except httpx.HTTPError as e:
+                # httpx.HTTPError menangkap semua error terkait request dan HTTP status
+                logger.info(f"Request failed: {e}")
 
-def send_end_session(phone: str) :
+async def send_end_session(phone: str) :
     flag = "instant"  # Optional: Enable extended message processing
 
     # Combine token and secret key exactly as in the PHP script
@@ -177,8 +189,15 @@ def send_end_session(phone: str) :
         "flag": flag
     }
 
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        logger.info(f"Request failed: {e}")
+    while True:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                
+                # (Opsional) return response jika berhasil
+                break
+                
+            except httpx.HTTPError as e:
+                # httpx.HTTPError menangkap semua error terkait request dan HTTP status
+                logger.info(f"Request failed: {e}")
