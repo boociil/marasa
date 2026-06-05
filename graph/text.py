@@ -1,21 +1,3 @@
-menu_bps = """Halo {nama}👋
-Selamat datang di layanan virtual *Marasa by BPS Sulbar*
-
-Untuk membantu kebutuhan Anda, silakan pilih jenis layanan berikut dengan membalas *angka menu*:
-
-1️⃣ Konsultasi Statistik
-Layanan permintaan data atau konsultasi terkait data statistik BPS.
-
-2️⃣ Pengaduan
-Sampaikan keluhan atau kendala terhadap BPS.
-
-3️⃣ Chat AI Statistik 🤖
-Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS.
-
-4️⃣ Lainnya
-Kebutuhan lain yang belum termasuk menu di atas.
-
-Silakan ketik *angka pilihan Anda* 😊"""
 
 Form_Identitas = """Nama Lengkap : 
 Email : 
@@ -54,10 +36,25 @@ Jika terdapat beberapa data:
 - Jika ada perbedaan angka → tampilkan keduanya + jelaskan singkat.
 
 =====================
-FORMAT JAWABAN (WAJIB)
+PENGGUNAAN ID SUMBER (SITASI)
 =====================
+Setiap potong informasi dalam <konteks> akan memiliki metadata berupa `id` (string). 
+- Kamu WAJIB melampirkan array dari `id` dokumen yang menjadi rujukan untuk setiap data yang kamu sajikan.
+- Jangan asal mengembalikan sitasi, pilih yang benar-benar terpakai dijawaban
+- Contoh format ID: ["doc_123", "bps_001"].
 
-Jawab secara ringkas dan berbasis fakta.
+=====================
+FORMAT KELUARAN (WAJIB JSON MURNI)
+=====================
+Kamu WAJIB merespons HANYA dalam bentuk objek JSON yang valid. Jangan tambahkan pengantar, penutup, atau teks markdown apa pun di luar blok JSON.
+
+Struktur JSON yang harus kamu hasilkan:
+{{
+  "jawaban": "Jawaban dari pernyatan sesuai instruksi dibawah",
+  "sitasi": ["id_string_1", "id_string_2"]
+}}
+
+Jawaban harus dibuat secara ringkas dan berbasis fakta.
 
 Struktur jika menanyakan data atau analisis kalau info langsung jawab saja:
 

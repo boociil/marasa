@@ -228,7 +228,7 @@ async def rag_rerank(state):
             chunks += item.print() +'\n\n'
         for item in state["question"][index].ddgs :
             chunks += item.print() +'\n\n'
-        logger.info(chunks)
+
         prompt =f""""
 Kamu adalah penilai relevansi dokumen untuk sistem RAG.
 
@@ -273,7 +273,6 @@ Daftar knowledge chunks:
             except Exception as e:
                 logger.info
 
-        logger.info
 
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag :
@@ -312,37 +311,71 @@ Daftar knowledge chunks:
                     )
                 )
        
+        state["question"][index].urutan_rag  = id_keep_rag
     return state
 
 async def rag_answer(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
+        
         chunks = ""
-
+        chunks_dict = {}
         for item in state["question"][index].rag_publikasi_brs_output :
-            chunks += item.print() +'\n\n'
+            chunks_dict[item.id] = item
         for item in state["question"][index].rag_data_output :
-            chunks += item.print() +'\n\n'
+            chunks_dict[item.id] = item
         for item in state["question"][index].ddgs_output :
-            chunks += item.print() +'\n\n'
+            chunks_dict[item.id] = item
 
+
+        for id_ in  state["question"][index].urutan_rag : 
+            if id_ in chunks_dict :
+                chunks += chunks_dict[id_].print()+'\n\n'
+        
         if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
             state["question"][index].answer.append(AnswerModel(type="text", text="Maaf, kami belum menemukan data yang sesuai."))
             continue
-        
-        
-
-        if len(state["question"][index].rag_publikasi_brs_output) > 0 :
-            for i, item in enumerate(state["question"][index].rag_publikasi_brs_output) :
-                state["question"][index].answer.append(AnswerModel(type="file", text=f"{item.title}, Hal {item.halaman}", file_path= findImagePathPublikasiBRS(item)))
-
 
         prompt = LLM_PROMPT.format(
             context=chunks,
             question=ques
         )
-        hasil = await llm_query_answer(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'))
-        state["question"][index].answer.append(AnswerModel(type="text", text=hasil))
+
+        hasil = None
+        while True:
+            try :
+                hasil_txt = await llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'),config={
+                    "response_mime_type": "application/json",
+                    "response_json_schema":  {
+                        
+                            "type": "object",
+                            "properties": {
+                                "jawaban": {
+                                    "type": "string",
+                                },
+                                "sitasi": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                }
+                            },
+                        
+                    },
+                })
+
+                # logger.info(hasil_txt)
+
+                hasil = json.loads(hasil_txt.replace("```",""))
+                break
+            except Exception as e:
+                logger.info(e)
+
+        for item_sitasi in hasil['sitasi'] :
+            if isinstance(item_sitasi, RagPublikasiBRS) :
+                state["question"][index].answer.append(AnswerModel(type="file", text=f"{item_sitasi.title}, Hal {item_sitasi.halaman}", file_path= findImagePathPublikasiBRS(item_sitasi)))
+        
+        state["question"][index].answer.append(AnswerModel(type="text", text=hasil['jawaban'], sitasi=hasil['sitasi']))
         
     return state
 

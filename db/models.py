@@ -1,7 +1,8 @@
-from peewee import *
-from db.db import BaseModel
+from peewee import CharField, IntegerField, DateTimeField, SmallIntegerField, BooleanField, ForeignKeyField, TextField, fn
+from db.db import BaseModel, db
 from datetime import datetime, timedelta
 from wablas.send import send_end_session
+from _global import logger
 
 class User(BaseModel):
     nama = CharField(max_length=255)
@@ -37,22 +38,22 @@ class Ticket(BaseModel):
 
 
 SESSION_TTL_HOURS = 24
-def session_cutoff_time():
+async def session_cutoff_time():
     return datetime.datetime.now() - datetime.timedelta(hours=SESSION_TTL_HOURS)
 
-def get_or_create_active_session(phoneNumber: str):
-    session = get_active_session(phoneNumber)
+async def get_or_create_active_session(phoneNumber: str):
+    session = await get_active_session(phoneNumber)
 
     if session:
         return session, False
     
     # buat session baru
-    new_session = ChatSession.create(phone = phoneNumber)
+    new_session = await ChatSession.aio_create(phone = phoneNumber)
     return new_session, True
 
-def get_active_session(phoneNumber: str) -> dict | None:
+async def get_active_session(phoneNumber: str) -> dict | None:
     try:
-        session = (
+        session = await db.get(
             ChatSession
             .select()
             .where(
@@ -61,22 +62,20 @@ def get_active_session(phoneNumber: str) -> dict | None:
                 (ChatSession.created_at >= session_cutoff_time())
             )
             .order_by(ChatSession.created_at.desc())
-            .get()
         )
         return session
 
     except ChatSession.DoesNotExist:
         return None
 
-def get_user_by_phone(phoneNumber: str) -> dict | None:
+async def get_user_by_phone(phoneNumber: str) -> dict | None:
     try:
-        user = (
+        user = await db.get(
             User
             .select()
             .where(
                 User.notelp == phoneNumber
             )
-            .first()
         )
         return user
 
@@ -84,8 +83,8 @@ def get_user_by_phone(phoneNumber: str) -> dict | None:
         return None
     
 
-def load_last_messages(session: ChatSession):
-    query = (
+async def load_last_messages(session: ChatSession):
+    query = await db.list(
         ChatMessage
         .select()
         .where(ChatMessage.session == session)
@@ -106,9 +105,9 @@ def load_last_messages(session: ChatSession):
 
     return content
 
-def iddle_task_konsultasi():
-    ten_minutes_ago = datetime.now() - timedelta(hours=12)
-    idle_sessions = (
+async def iddle_task_konsultasi():
+    twelve_hour_ago = datetime.now() - timedelta(hours=12)
+    idle_sessions = await db.list(
         ChatSession
         .select(
             ChatSession,
@@ -120,24 +119,17 @@ def iddle_task_konsultasi():
         )
         .join(ChatMessage)
         .group_by(ChatSession)
-        .having(fn.MAX(ChatMessage.created_at) < ten_minutes_ago)
+        .having(fn.MAX(ChatMessage.created_at) < twelve_hour_ago)
     )
 
     for item in idle_sessions :
-        last_msg = (ChatMessage
-            .select()
-            .where(ChatMessage.session == item.id)
-            .order_by(ChatMessage.created_at.desc())
-            .first())
-        
-        if last_msg.role == 'user' :
-            item.is_done = True
-            item.save()
+        item.is_done = True
+        await item.aio_save()
 
 
-def iddle_task_ai():
+async def iddle_task_ai():
     ten_minutes_ago = datetime.now() - timedelta(minutes=10)
-    idle_sessions = (
+    idle_sessions = await db.list(
         ChatSession
         .select(
             ChatSession,
@@ -153,22 +145,21 @@ def iddle_task_ai():
     )
 
     for item in idle_sessions :
-        last_msg = (ChatMessage
+        last_msg = await db.get(ChatMessage
             .select()
             .where(ChatMessage.session == item.id)
-            .order_by(ChatMessage.created_at.desc())
-            .first())
+            .order_by(ChatMessage.created_at.desc()))
         
-        if last_msg.role == 'user' :
+        if last_msg.role == 'bot' :
             item.is_done = True
-            item.save()
+            await item.aio_save()
 
             send_end_session(item.phone)
 
 
-def get_active_session(session_in_works):
+async def get_active_session_not_arr(session_in_works):
     five_second_ago = datetime.now() - timedelta(seconds=5)
-    batch_sessions = (
+    batch_sessions = await db.list(
         ChatSession
         .select(
             ChatSession,
@@ -185,10 +176,10 @@ def get_active_session(session_in_works):
 
     return batch_sessions[:(5 - len(session_in_works))]
 
-def close_24_hour():
+async def close_24_hour():
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
 
-    sessions_to_close = (
+    sessions_to_close = await db.list(
         ChatSession
         .select(ChatSession.id)
         .join(ChatMessage)
@@ -203,6 +194,6 @@ def close_24_hour():
         .where(ChatSession.id.in_(sessions_to_close))
     )
 
-    rows_updated = update_query.execute()
+    rows_updated = await db.run(update_query.execute)
 
     print(f"Berhasil menutup {rows_updated} sesi chat yang idle selama 24 jam.")

@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv, find_dotenv
-from peewee_async import MySQLDatabase, AioModel
+from peewee_async import AioModel
+from playhouse.pwasyncio import AsyncMySQLDatabase
 
 load_dotenv(find_dotenv()) 
 
-db = MySQLDatabase(
+db = AsyncMySQLDatabase(
     os.getenv('DB_DATABASE'),
     user=os.getenv('DB_USERNAME'),
     password=os.getenv('DB_PASSWORD'),

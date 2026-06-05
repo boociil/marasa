@@ -63,19 +63,19 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
     result = await graph.ainvoke(state)
 
     if result['check'] == 'PUAS' :
-        send_simple_text(user.notelp, 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊')
+        await send_simple_text(user.notelp, 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊')
         session.is_done = True;
-        session.save()
+        await session.aio_save()
         return
     elif result['check'] == 'ADMIN' :
-        send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
+        await send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
         session.is_done = True;
-        session.save()
+        await session.aio_save()
         return
     elif  result['check'] == 'OFF' :
-        send_simple_text(user.notelp, 'Waduh, maaf banget nih, sepertinya pertanyaan tadi di luar topik statistik BPS. Yuk, kita kembali ke jalur utama!')
+        await send_simple_text(user.notelp, 'Waduh, maaf banget nih, sepertinya pertanyaan tadi di luar topik statistik BPS. Yuk, kita kembali ke jalur utama!')
         session.is_done = True;
-        session.save()
+        await session.aio_save()
         return
     #TANYA
  
@@ -90,10 +90,10 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
     path_ori = []
     for item_answer in answer:
         if item_answer.file_path is None :
-            send_simple_text(user.notelp, item_answer.text)
+            await send_simple_text(user.notelp, item_answer.text)
         else :
             if item_answer.file_path not in path_ori :
-                send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
+                await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
                 path_ori.append(item_answer.file_path)
     
 

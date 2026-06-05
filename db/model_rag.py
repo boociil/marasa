@@ -55,6 +55,7 @@ class AnswerModel(BaseModel):
     type: str #file, text, system
     file_path: Optional[str] = None
     text: Optional[str] = None
+    sitasi: list[str] = []
 
 class QuestionModel(BaseModel):
     ques: Optional[str] = None
@@ -64,6 +65,7 @@ class QuestionModel(BaseModel):
     rag_publikasi_brs: list[RagPublikasiBRS] = []
     rag_data: list[RagData] = []
     ddgs: list[DDGS] = []
+    urutan_rag: list[str] = []
     rag_publikasi_brs_output: list[RagPublikasiBRS] = []
     rag_data_output: list[RagData] = []
     ddgs_output: list[DDGS] = []

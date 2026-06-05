@@ -25,7 +25,7 @@ def extract_form_data(text: str):
             result[field] = match.group(1).strip()
     return result
 
-def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User, bool]:
+async def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User, bool]:
     phone = message.phone
     nama_lengkap = user.nama_lengkap if user is not None else message.pushName
     stop = False
@@ -42,8 +42,8 @@ def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User,
             extract_form = extract_form_data(message.message)
         
         if not check_iden: 
-            send_simple_text(phone, Kalimat_Pembuka.format(nama = nama_lengkap))
-            send_simple_text(phone, Form_Identitas)
+            await send_simple_text(phone, Kalimat_Pembuka.format(nama = nama_lengkap))
+            await send_simple_text(phone, Form_Identitas)
             stop = True
         else:
             try:
@@ -73,7 +73,7 @@ def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User,
                 # if not validate_email(email_input): raise EmailNotValidError("email format salah")
                 validate_email(email_input)
                 
-                user = User.create(
+                user = await User.aio_create(
                     nama = message.pushName,
                     notelp = phone,
                     email = email_input,
@@ -85,15 +85,15 @@ def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User,
            
             except EmailNotValidError as e:
                 logger.info(f"Error Email: {e}")
-                send_simple_text(phone, "Mohon maaf email tidak sesuai format\ncontoh : abc@contoh.com")
+                await send_simple_text(phone, "Mohon maaf email tidak sesuai format\ncontoh : abc@contoh.com")
                 stop = True
             except ValueError as e:
                 logger.info(f"Error Tahun: {e}")
-                send_simple_text(phone, "Mohon maaf tahun lahir tidak sesuai format\ncontoh : 1995")
+                await send_simple_text(phone, "Mohon maaf tahun lahir tidak sesuai format\ncontoh : 1995")
                 stop = True
             except Exception as e:
                 logger.info(f"Error Umum: {e}")
-                send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
+                await send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
                 stop = True
     
      
