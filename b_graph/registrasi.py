@@ -1,53 +1,51 @@
 import re
 from graph.text import Form_Identitas, Kalimat_Pembuka
 from email_validator import validate_email, EmailNotValidError
-from _global import logger
+from _global import logger, shared_cache
 from db.model_wablas import WablasIncomingMessage
-from db.models import User
+from db.models import User, ChatSession
 from typing import Tuple
 from wablas.send import send_simple_text
 
 FORM_PATTERNS = {
-    "nama_lengkap": r"nama\s*lengkap\s*:\s*(.*)",
-    "email": r"email\s*:\s*(.*)",
-    "tahun_lahir": r"tahun\s*lahir\s*:\s*(\d*)",
-    "pekerjaan": r"pekerjaan\s*:\s*(.*)",
-    "instansi": r"instansi.*?:\s*(.*)",
+    "nama_lengkap": r"^nama\s*lengkap\s*:\s*(.+)$",
+    "email": r"^email\s*:\s*(.+)$",
+    "tahun_lahir": r"^tahun\s*lahir\s*:\s*(\d+)$",
+    "pekerjaan": r"^pekerjaan\s*:\s*(.+)$",
+    "instansi": r"^instansi.*?:\s*(.+)$",
 }
 
 def extract_form_data(text: str):
-    text_lower = text.lower()
     result = {}
+    for line in text.splitlines():
+        line = line.strip()
 
-    for field, pattern in FORM_PATTERNS.items():
-        match = re.search(pattern, text_lower, re.IGNORECASE)
-        if match:
-            result[field] = match.group(1).strip()
+        for field, pattern in FORM_PATTERNS.items():
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                result[field] = match.group(1).strip()
+                break
+
     return result
 
-async def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User, bool]:
+async def registrasi(user: User | None, session: ChatSession, message :WablasIncomingMessage) -> Tuple[User, bool, bool]:
     logger.info('registrasi')
     phone = message.phone
     nama_lengkap = user.nama_lengkap if user is not None else message.pushName
     stop = False
-
-    if user is not None :
-        stop = True
+    send_start_layanan = False
 
     if user is None:
-        check_iden = False
-        extract_form = {}
-
-        if 'nama lengkap' in message.message.lower():
-            check_iden = True
-            extract_form = extract_form_data(message.message)
-        
-        if not check_iden: 
+        stop = True
+        if not shared_cache.get(f'kirim_regis__{session.id}__{phone}', False) :
             await send_simple_text(phone, Kalimat_Pembuka.format(nama = nama_lengkap))
             await send_simple_text(phone, Form_Identitas)
-            stop = True
+            shared_cache.set(f'kirim_regis__{session.id}__{phone}', True)
         else:
+            if 'nama lengkap' not in message.message.lower():
+                await send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
             try:
+                extract_form = extract_form_data(message.message)
                 logger.info(extract_form)
                 
                 # 2. Gunakan .get() agar terhindar dari KeyError jika regex gagal menangkap field
@@ -69,9 +67,6 @@ async def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple
                 if not tahun_lahir_input:
                     raise ValueError("tahun_lahir kosong")
                 
-                # CATATAN: Pastikan fungsi validate_email me-raise error jika tidak valid.
-                # Jika fungsi Anda hanya me-return boolean, ubah menjadi:
-                # if not validate_email(email_input): raise EmailNotValidError("email format salah")
                 validate_email(email_input)
                 
                 user = await User.aio_create(
@@ -83,19 +78,15 @@ async def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple
                     instansi = instansi_input,
                     tahun_lahir = int(tahun_lahir_input),
                 )
-           
+                send_start_layanan = True
             except EmailNotValidError as e:
                 logger.info(f"Error Email: {e}")
                 await send_simple_text(phone, "Mohon maaf email tidak sesuai format\ncontoh : abc@contoh.com")
-                stop = True
             except ValueError as e:
                 logger.info(f"Error Tahun: {e}")
                 await send_simple_text(phone, "Mohon maaf tahun lahir tidak sesuai format\ncontoh : 1995")
-                stop = True
             except Exception as e:
-                logger.info(f"Error Umum: {e}")
                 await send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
-                stop = True
     
      
-    return user, stop
+    return user, stop, send_start_layanan

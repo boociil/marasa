@@ -9,6 +9,7 @@ from db.model_wablas import WablasIncomingMessage
 from db.models import get_user_by_phone
 from b_graph.set_layanan import set_layanan
 from b_graph.registrasi import registrasi
+from b_graph.start_layanan import start_layanan
 load_dotenv()
 
 
@@ -29,7 +30,8 @@ async def debounce_per_user_worker():
     while True:
         await asyncio.sleep(1) # Loop cek setiap 1 detik
         session_to_work = await get_active_session_not_arr(list(session_in_works))
-        
+        if len(session_in_works) > 0 :
+            logger.info(session_to_work)
         for item in session_to_work : 
             session_id = item.id
             if session_id in session_in_works:
@@ -78,9 +80,10 @@ async def wablas(data: WablasIncomingMessage):
     global id_pesan
     if data.phone != '6282195195502':
         return {"status": True}
+    logger.info(data)
+
     if data.message.strip() == '' :
         return {"status": True}
-    logger.info(data)
     if data.id in id_pesan :
         return {"status": True}
     
@@ -91,11 +94,13 @@ async def wablas(data: WablasIncomingMessage):
     phone = data.phone
     user = await get_user_by_phone(phone)
 
-    session, baru_status, stop = await set_layanan(user, data)
+    session, stop, send_start_layanan = await set_layanan(user, data)
     if stop :
         return {"status": True}
     
-    stop = await registrasi(user, data)
+    user, stop, send_start_layanan = await registrasi(user, session, data)    
+    if send_start_layanan :
+        await start_layanan(user, session)
     if stop :
         return {"status": True}
 

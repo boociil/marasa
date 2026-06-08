@@ -6,10 +6,15 @@ import asyncio
 from _global import logger
 
 async def is_working_hours(dt_to_check):
-    start_time = time(8, 0)
-    end_time = time(15, 0)
-    return start_time <= dt_to_check.time() <= end_time
-
+    if dt_to_check.weekday() < 4 : 
+        start_time = time(8, 0)
+        end_time = time(15, 30)
+        return start_time <= dt_to_check.time() <= end_time
+    elif dt_to_check.weekday() == 4 : 
+        start_time = time(8, 0)
+        end_time = time(16, 0)
+        return start_time <= dt_to_check.time() <= end_time
+    
 async def is_weekday(dt_to_check):
     """Mengecek apakah hari Senin - Jumat (0 = Senin, 5 = Sabtu, 6 = Minggu)"""
     return dt_to_check.weekday() < 5

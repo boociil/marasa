@@ -5,9 +5,8 @@ Tahun Lahir :
 Pekerjaan : 
 Instansi/Tempat Aktivitas Sehari-hari : """
 
-Kalimat_Pembuka = """Hai {nama}👋
-Selamat datang di layanan virtual *Marasa by BPS Sulbar* 
-Sebelum mulai, mohon isi form identitas dulu ya untuk dokumentasi kami 😊"""
+Kalimat_Pembuka = """Bapak/Ibu {nama}👋
+Sebelum mulai, mohon isi form identitas dulu ya untuk dokumentasi kami 😊 😊"""
 
 
 LLM_PROMPT = """
