@@ -5,20 +5,24 @@ import os
 from loguru import logger
 from diskcache import Cache
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, "log")
+
 
 load_dotenv(find_dotenv()) 
 
 def get_vectorstore_pdf():
-    return Chroma(persist_directory=os.getenv('CHROMA_PATH_ISI_PDF'), embedding_function=get_embedding_function())
+    return Chroma(persist_directory= os.path.join(BASE_DIR, os.getenv('CHROMA_PATH_ISI_PDF')), embedding_function=get_embedding_function())
 
 def get_vectorstore_table():
-    return Chroma(persist_directory=os.getenv('CHROMA_PATH_TABLE'), embedding_function=get_embedding_function())
+    return Chroma(persist_directory= os.path.join(BASE_DIR, os.getenv('CHROMA_PATH_TABLE')), embedding_function=get_embedding_function())
+
 
 vectorstore_isi_pdf = get_vectorstore_pdf()
 vectorstore_table = get_vectorstore_table()
 
 logger.add(
-    "log/api_{time:YYYY-MM-DD}.log", # Nama file akan jadi seperti log/api_2026-05-26.log
+    os.path.join(LOG_DIR, "api_{time:YYYY-MM-DD}.log"), # Nama file akan jadi seperti log/api_2026-05-26.log
     rotation="00:00",                # Buat file baru setiap jam 12 malam (tengah malam)
     retention="30 days",             # Opsional: Otomatis hapus file log yang lebih tua dari 30 hari
     level="INFO"

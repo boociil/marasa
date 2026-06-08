@@ -99,8 +99,9 @@ async def send_menu(phone: str, work_status, nama_lengkap) :
                     "message": {
                         "title": "Menu Layanan",
                         "description": f"""Halo {nama_lengkap}👋
-    Selamat datang di layanan virtual *Marasa by BPS Sulbar*
-    Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
+Selamat datang di layanan virtual *Marasa by BPS Sulbar*
+
+Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
                         "buttonText": "Pilih layanan",
                         "lists": [
                             {
@@ -133,8 +134,9 @@ async def send_menu(phone: str, work_status, nama_lengkap) :
                     "message": {
                         "title": "Menu Layanan",
                         "description": f"""Halo {nama_lengkap}👋
-    Selamat datang di layanan virtual *Marasa by BPS Sulbar*
-    Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
+Selamat datang di layanan virtual *Marasa by BPS Sulbar*
+
+Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
                         "buttonText": "Pilih layanan",
                         "lists": [
                             {
@@ -164,7 +166,7 @@ async def send_menu(phone: str, work_status, nama_lengkap) :
     while True:
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url, headers=headers, json=payload, verify=False)
+                response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 
                 # (Opsional) return response jika berhasil

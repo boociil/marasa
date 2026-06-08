@@ -26,6 +26,7 @@ def extract_form_data(text: str):
     return result
 
 async def registrasi(user: User | None, message :WablasIncomingMessage) -> Tuple[User, bool]:
+    logger.info('registrasi')
     phone = message.phone
     nama_lengkap = user.nama_lengkap if user is not None else message.pushName
     stop = False

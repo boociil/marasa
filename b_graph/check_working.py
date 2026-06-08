@@ -43,6 +43,8 @@ async def is_holiday(dt_to_check):
                 else:
                     holidays = []
                 
+            logger.info("holidays_"+str(year))
+            logger.info(holidays)
 
             shared_cache.set("holidays_"+str(year), holidays)
                 
@@ -60,15 +62,15 @@ async def check_work_status(dt_to_check=None):
         dt_to_check = datetime.now()
         
     # 1. Validasi Jam Kerja
-    if not is_working_hours(dt_to_check):
+    if not await is_working_hours(dt_to_check):
         return False, "Di luar jam kerja (Hanya aktif 08.00 - 15.00)"
         
     # 2. Validasi Hari Kerja (Bukan akhir pekan)
-    if not is_weekday(dt_to_check):
+    if not await is_weekday(dt_to_check):
         return False, "Bukan hari kerja (Akhir pekan)"
         
     # 3. Validasi Tanggal Merah
-    if is_holiday(dt_to_check):
+    if await is_holiday(dt_to_check):
         return False, "Hari libur nasional / Tanggal merah"
         
     return True, "Jam operasional aktif (Saat ini adalah hari dan jam kerja)"
