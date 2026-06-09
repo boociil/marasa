@@ -137,18 +137,21 @@ async def iddle_task_ai():
 
 async def get_active_session_not_arr(session_in_works):
     five_second_ago = datetime.now() - timedelta(seconds=5)
-    batch_sessions = list(await ChatSession
-        .select(
-            ChatSession,
-            fn.MAX(ChatMessage.created_at).alias("last_chat_time")
-        )
-        .where(
-            ( (ChatSession.layanan == 2) | (ChatSession.layanan == 3) ) &
-            (ChatSession.is_done == False) & (ChatSession.id.not_in(session_in_works))
-        )
-        .join(ChatMessage)
-        .group_by(ChatSession)
-        .having(fn.MAX(ChatMessage.created_at) < five_second_ago)
+
+    last_msg_subquery = (ChatMessage
+                     .select(fn.MAX(ChatMessage.id))
+                     .group_by(ChatMessage.session))
+
+    batch_sessions = list(await (ChatSession
+            .select(ChatSession, ChatMessage)
+            .join(ChatMessage)
+            .where(
+                 ( (ChatSession.layanan == 2) | (ChatSession.layanan == 3) ) &
+                (ChatSession.is_done == False) &
+                (ChatMessage.id << last_msg_subquery) & # Pastikan ini pesan terakhir
+                (ChatMessage.role == 'user') &          # Role terakhir adalah user
+                (ChatMessage.created_at < five_second_ago)    # Sudah lewat 5 detik
+            ))
         .aio_execute()
     )
 

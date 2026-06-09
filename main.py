@@ -22,7 +22,6 @@ def on_finish_callback(task, id_session: str) :
         task.result()
         if id_session in session_in_works:
             session_in_works.discard(id_session)
-
     except Exception:
         logger.exception("main_chat error")  
 
@@ -30,16 +29,16 @@ async def debounce_per_user_worker():
     while True:
         await asyncio.sleep(1) # Loop cek setiap 1 detik
         session_to_work = await get_active_session_not_arr(list(session_in_works))
-        if len(session_in_works) > 0 :
-            logger.info(session_to_work)
+        # if len(session_to_work) > 0 :
+        #     logger.info(session_to_work)
         for item in session_to_work : 
             session_id = item.id
             if session_id in session_in_works:
                 continue
             session_in_works.add(session_id)
 
-            all_messages = ChatMessage.where(ChatMessage.session == session_id).order_by(ChatMessage.created_at).select().aio_execute()
-
+            all_messages = list(await ChatMessage.select().where(ChatMessage.session == item).order_by(ChatMessage.created_at).aio_execute())
+            logger.info(all_messages)
             new_message = []
             for item_m in all_messages :
                 if item_m.role == "user" :

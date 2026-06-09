@@ -32,7 +32,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
             await send_simple_text(phone, f"Mohon maaf Bapak/Ibu *{nama_lengkap}* ⏳, admin sedang tidak aktif karena di luar jam kerja . 🙏")
             stop = True
             return session, stop, send_start_layanan
-        if not baru_status :
+        if session.layanan == 1:
             session.is_done = True
             await session.aio_save()
             session, baru_status = await get_or_create_active_session(phone)
@@ -40,7 +40,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
         await session.aio_save()    
         send_start_layanan = True
     elif '<~ 2️⃣ Pengaduan' in message.message:
-        if not baru_status :
+        if session.layanan == 2:
             session.is_done = True
             await session.aio_save()
             session, baru_status = await get_or_create_active_session(phone)
@@ -48,7 +48,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
         await session.aio_save()
         send_start_layanan = True
     elif '<~ 3️⃣ Chat AI Statistik 🤖' in message.message:
-        if not baru_status :
+        if session.layanan == 3:
             session.is_done = True
             await session.aio_save()
             session, baru_status = await get_or_create_active_session(phone)

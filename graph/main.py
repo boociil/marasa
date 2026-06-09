@@ -44,7 +44,7 @@ def build_graph():
    
 
 async def main_chat(graph, session: ChatSession, message: List[str]): 
-    user = get_user_by_phone(session.phone)
+    user = await get_user_by_phone(session.phone)
 
     state = {
         "check": 'TANYA',
@@ -83,6 +83,8 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
     for item_ques in result['question']:
         for item_answer in item_ques.answer:
             answer.append(item_answer)
+            logger.info(item_answer.text)
+            logger.info("")
 
     if len(result['question']) > 0 :
         answer.append(AnswerModel(type="text", text=ai_disclaimen))
@@ -95,7 +97,21 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
             if item_answer.file_path not in path_ori :
                 await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
                 path_ori.append(item_answer.file_path)
-    
+
+    for item_ques in result['question']:
+        for item_answer in item_ques.answer:
+            if item_answer.file_path is None :
+                await ChatMessage.aio_create(
+                    session = session,
+                    role = "bot",
+                    content = item_answer.text,
+                )
+            else :
+                await ChatMessage.aio_create(
+                    session = session,
+                    role = "bot",
+                    content =  f"{item_answer.file_path} {item_answer.text}",
+                )
 
 
 async def main_chat_cmd(graph, text: list[str], chat_history: list[str]): 
