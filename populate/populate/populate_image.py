@@ -4,32 +4,20 @@ import os
 import json
 import unicodedata
 from pdf2image import convert_from_path
+from datetime import datetime
 
 load_dotenv(find_dotenv()) 
 PDF_JSON = os.getenv('PDF_JSON')
-PATH_LAST = os.getenv('PATH_LAST')
 
 def populate_image():
-    PATH_LAST = ""
     MULAI_ENBED = True
-
-    if os.path.exists(os.getenv('PATH_LAST')):
-        try:
-            with open(os.getenv('PATH_LAST'), 'r') as f:
-                PATH_LAST = str(f.read().strip())
-                MULAI_ENBED = True
-        except FileNotFoundError:
-            nomor_baris = 0
-    else : 
-        MULAI_ENBED = False
-        return
-    
-
     data = {}
     with open(PDF_JSON, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     for item in data['publication'] :
+        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year != datetime.now().year  : 
+            continue
         title = secure_filename(item['rl_date']+'-'+item['title'])
         path = os.path.join(os.getenv("PDF_ALL_FOLDER_Publikasi"), title.replace("/", "-") + ".pdf")
         path_folder = os.path.join(os.getenv("IMAGES_FOLDER_Publikasi"), title.replace("/", "-"))
@@ -51,11 +39,9 @@ def populate_image():
                 page.save(os.path.join(path_folder,str(i)+'.jpg'), 'JPEG')
                 i = i+1
 
-            if path == PATH_LAST :
-                MULAI_ENBED = False
-                break
-
     for item in data['pressrelease'] :
+        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year != datetime.now().year  : 
+            continue
         title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
         path = os.path.join(os.getenv("PDF_ALL_FOLDER_BRS"), title.replace("/", "-") + ".pdf")
         path_folder = os.path.join(os.getenv("IMAGES_FOLDER_BRS"), title.replace("/", "-"))
@@ -76,10 +62,6 @@ def populate_image():
             for page in pages:
                 page.save(os.path.join(path_folder,str(i)+'.jpg'), 'JPEG')
                 i = i+1
-
-            if path == PATH_LAST :
-                MULAI_ENBED = False
-                break
 
 
 INVALID_FILE_CHARS = '/\\?%*:|"<>' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words

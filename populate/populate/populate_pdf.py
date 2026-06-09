@@ -11,6 +11,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 import json
 import unicodedata
+from datetime import datetime
 
 load_dotenv(find_dotenv()) 
 
@@ -26,26 +27,15 @@ def populate_pdf():
         embedding_function=get_embedding_function() # Pastikan fungsi ini ada
     )
 
-    PATH_LAST = ""
-    MULAI_ENBED = False
-
-    if os.path.exists(os.getenv('PATH_LAST')):
-        try:
-            with open(os.getenv('PATH_LAST'), 'r') as f:
-                PATH_LAST = str(f.read().strip())
-                MULAI_ENBED = False
-        except FileNotFoundError:
-            nomor_baris = 0
-    else : 
-        MULAI_ENBED = True
-        open(os.getenv('PATH_LAST'), "w").close()
-    
+    MULAI_ENBED = True
 
     data = {}
     with open(PDF_JSON, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     for item in data['publication'] :
+        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year != datetime.now().year  : 
+            continue
         title = secure_filename(item['rl_date']+'-'+item['title'])
         path = os.path.join(os.getenv("PDF_ALL_FOLDER_Publikasi"), title.replace("/", "-") + ".pdf")
         print(title)
@@ -79,6 +69,8 @@ def populate_pdf():
                 MULAI_ENBED = True
 
     for item in data['pressrelease'] :
+        if datetime.strptime(item['rl_date'], "%Y-%m-%d").year != datetime.now().year  : 
+            continue
         title = secure_filename(item['rl_date']+'-'+str(item['brs_id'])+'-'+str(item['subj']))
         path = os.path.join(os.getenv("PDF_ALL_FOLDER_BRS"), title.replace("/", "-") + ".pdf")
         if not os.path.exists(path):

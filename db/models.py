@@ -2,7 +2,7 @@ from peewee import CharField, IntegerField, DateTimeField, SmallIntegerField, Bo
 from db.db import BaseModel
 from datetime import datetime, timedelta
 from wablas.send import send_end_session
-from _global import logger
+from _global import logger, session_in_works
 
 class User(BaseModel):
     nama = CharField(max_length=255)
@@ -109,7 +109,7 @@ async def iddle_task_konsultasi():
 
 
 async def iddle_task_ai():
-    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
+    ten_minutes_ago = datetime.now() - timedelta(minutes=1)
     idle_sessions = list(await ChatSession
         .select(
             ChatSession,
@@ -126,16 +126,17 @@ async def iddle_task_ai():
     )
 
     for item in idle_sessions :
-        last_msg = await ChatMessage.select().where(ChatMessage.session == item.id).order_by(ChatMessage.created_at.desc()).aio_get()
+        if session_in_works.get(f'kirim_regis__{item.id}', False):
+            continue
+        last_msg = list(await ChatMessage.select().where(ChatMessage.session == item.id).order_by(ChatMessage.created_at.desc()).aio_execute())
         
-        if last_msg.role == 'bot' :
+        if last_msg[0].role == 'bot' :
             item.is_done = True
             await item.aio_save()
+            await send_end_session(item.phone)
 
-            send_end_session(item.phone)
 
-
-async def get_active_session_not_arr(session_in_works):
+async def get_active_session_not_arr():
     five_second_ago = datetime.now() - timedelta(seconds=5)
 
     last_msg_subquery = (ChatMessage
@@ -155,7 +156,7 @@ async def get_active_session_not_arr(session_in_works):
         .aio_execute()
     )
 
-    return batch_sessions[:(5 - len(session_in_works))]
+    return batch_sessions
 
 async def close_24_hour():
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)

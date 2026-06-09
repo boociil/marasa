@@ -191,7 +191,7 @@ async def rag_search(state):
                     state["question"][index].rag_publikasi_brs.append(
                         RagPublikasiBRS( 
                             id = str(uuid.uuid4()),
-                            bps_id = bps_id,
+                            bps_id = str(bps_id),
                             type = type,
                             title = doc.metadata['title'], 
                             halaman= int(doc.id.split(':')[-2])+1, 

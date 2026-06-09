@@ -15,7 +15,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
     session, baru_status = await get_or_create_active_session(phone)
 
     logger.info('set_layanan')
-    logger.info(f'kirim_menu__{session.id}__{phone}')
+    logger.info(f'kirim_menu__{session.id}__{phone}__{baru_status}')
 
     stop = False
     send_start_layanan = False
@@ -27,7 +27,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
         await send_menu(phone, work_status, nama_lengkap)
         stop = True
     
-    if '<~ 1️⃣ Konsultasi Statistik' in message.message:
+    if '<~ 1 Konsultasi Statistik' in message.message.encode('ascii', 'ignore').decode('utf-8'):
         if not work_status :
             await send_simple_text(phone, f"Mohon maaf Bapak/Ibu *{nama_lengkap}* ⏳, admin sedang tidak aktif karena di luar jam kerja . 🙏")
             stop = True
@@ -39,7 +39,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
         session.layanan = 1
         await session.aio_save()    
         send_start_layanan = True
-    elif '<~ 2️⃣ Pengaduan' in message.message:
+    elif '<~ 2 Pengaduan' in message.message.encode('ascii', 'ignore').decode('utf-8'):
         if session.layanan == 2:
             session.is_done = True
             await session.aio_save()
@@ -47,7 +47,7 @@ async def set_layanan(user: User | None, message :WablasIncomingMessage) -> Tupl
         session.layanan = 2
         await session.aio_save()
         send_start_layanan = True
-    elif '<~ 3️⃣ Chat AI Statistik 🤖' in message.message:
+    elif '<~ 3 Chat AI Statistik' in message.message.encode('ascii', 'ignore').decode('utf-8'):
         if session.layanan == 3:
             session.is_done = True
             await session.aio_save()
