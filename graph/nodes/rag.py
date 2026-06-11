@@ -206,7 +206,7 @@ async def rag_search(state):
                             type = type,
                             title = doc.metadata['title'], 
                             halaman= int(doc.id.split(':')[-2])+1, 
-                            content = await get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
+                            content = doc.page_content if int(doc.id.split(':')[-1]) == 0 else await get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
                             rl_date = doc.metadata['rl_date'], 
                             file_path = path_image,
                             score= _score

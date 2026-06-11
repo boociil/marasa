@@ -4,6 +4,7 @@ from _global import shared_cache
 import httpx
 import asyncio
 from _global import logger
+from zoneinfo import ZoneInfo
 
 async def is_working_hours(dt_to_check):
     if dt_to_check.weekday() < 4 : 
@@ -64,7 +65,7 @@ async def is_holiday(dt_to_check):
 async def check_work_status(dt_to_check=None):
     """Fungsi utama untuk memvalidasi semua kondisi"""
     if dt_to_check is None:
-        dt_to_check = datetime.now()
+        dt_to_check = datetime.now(ZoneInfo("Asia/Makassar"))
         
     # 1. Validasi Jam Kerja
     if not await is_working_hours(dt_to_check):
