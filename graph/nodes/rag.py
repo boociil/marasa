@@ -1,15 +1,15 @@
-from graph.rag.retriever import  get_rag_data_arr, get_content_rag_data_by_halaman, get_rag_data_table_arr
+from graph.rag.retriever import  get_rag_data_arr, get_rag_data_table_arr, get_ddgs_arr
 from graph.text import LLM_PROMPT
-from graph.llm import llm_query, llm_query_answer
+from graph.llm import llm_query
 from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
 from dotenv import load_dotenv, find_dotenv
 import os
-import uuid
 import json
 import unicodedata
 from langchain_community.tools import DuckDuckGoSearchResults
-from _global import logger, BASE_DIR
-from pathlib import Path
+from _global import logger
+
+import asyncio
 
 load_dotenv(find_dotenv()) 
 
@@ -44,6 +44,31 @@ Aturan Ekstraksi Pertanyaan & Kata Kunci:
 Aturan Optimasi Kueri Pencarian RAG:
 - Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan yang diekstrak.
 - Buat lebih dari 1 kueri pencarian jika ada beberapa indikator yang dicari (Misal: jika mencari "hubungan variabel A dan B", buat kueri untuk A, kueri untuk B, dan kueri untuk hubungan keduanya).
+- LAKUKAN EKSPANSI TERMINOLOGI STATISTIK: Terjemahkan bahasa awam ke dalam istilah resmi Badan Pusat Statistik (BPS) pada kueri pencarian. contoh :
+    A. Ekonomi Makro & Kesejahteraan:
+        1. Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi.
+        2. Daya beli / pengeluaran warga ➔ PKRT (Pengeluaran Konsumsi Rumah Tangga), Pengeluaran per Kapita.
+        3. Inflasi / harga naik ➔ IHK (Indeks Harga Konsumen).
+        4. Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin (P0), Garis Kemiskinan.
+        5. Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan.
+    B. Ketenagakerjaan:
+        1. Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka).
+        2. Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK.
+        3. Orang kerja ➔ Penduduk Bekerja.
+    C. Sosial, Pendidikan, Kesehatan:
+        1. Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia).
+        2. Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup).
+        3. Pendidikan / putus sekolah ➔ RLS (Rata-rata Lama Sekolah), HLS (Harapan Lama Sekolah).
+    D. Pertanian & Kesejahteraan Petani:
+        1. Kesejahteraan petani ➔ NTP (Nilai Tukar Petani), NTUP (Nilai Tukar Usaha Pertanian).
+        2. Hasil panen / produksi tani ➔ Luas Panen, Produktivitas, Produksi.
+    E. Bahasa Sektor / Lapangan Usaha Eksekutif:
+        a. Sektor industri / pabrik / manufaktur ➔ PDRB Lapangan Usaha Industri Pengolahan.
+        b.Pariwisata / hotel / restoran / pengunjung ➔ PDRB Lapangan Usaha Penyediaan Akomodasi dan Makan Minum, Tingkat Penghunian Kamar (TPK), Jumlah Wisatawan.
+        c. Tambang / galian ➔ PDRB Lapangan Usaha Pertambangan dan Penggalian.
+        d. Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran.
+        e. Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi.
+        f. Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan.
 - Pertahankan bahasa asli.
 - Perluas kata kunci (gunakan sinonim atau kepanjangan dari singkatan, misal: TPAK menjadi Tingkat Partisipasi Angkatan Kerja).
 - Hapus kata-kata percakapan atau basa-basi (seperti "tolong", "halo", "carikan").
@@ -159,77 +184,16 @@ async def rag_search(state):
         query = state["question"][index].rag_ques
         keywords = state["question"][index].keyword
 
-        while True:
-            try :
-                search = DuckDuckGoSearchResults(output_format="list")
-                logger.info(f"site:bps.go.id {', '.join(query)}")
-                results_list = await search.ainvoke(f"site:bps.go.id {', '.join(query)}")
+        ddgs_,docs_pdf, docs_table = await asyncio.gather(
+            get_ddgs_arr(query),
+            get_rag_data_arr(query, keywords, 5),
+            get_rag_data_table_arr(query, keywords, 5)
+        )
 
-                for res in results_list:
-                    state["question"][index].ddgs.append(
-                        DDGS( 
-                            id = str(uuid.uuid4()),
-                            snippet = res['snippet'] ,
-                            title = res['title'],
-                            link = res['link'],
-                        )
-                    )
-                break
-            except Exception as e:
-                logger.info(e)
+        state["question"][index].ddgs = ddgs_
+        state["question"][index].rag_publikasi_brs = docs_pdf
+        state["question"][index].rag_data = docs_table
 
-        docs_pdf = await get_rag_data_arr(query, 5)
-        sorce_page_unique = []
-        for doc, _score in docs_pdf:
-            bps_id = ""
-            type = ""
-
-            path_folder = str(doc.id).split(":")[0]
-            if path_folder.endswith(".pdf"):
-                path_folder = path_folder[:-4]
-            path_image = os.path.join(BASE_DIR, path_folder,str(int(doc.metadata['page'])+1)+'.jpg')
-            path_image = path_image.replace("/PDF_ALL/","/IMAGES/")
-            path_image = str(Path(path_image.replace("\\", "/")))
-
-            if 'pub_id' in doc.metadata : 
-                bps_id = doc.metadata['pub_id']
-                type = 'pub'
-            if 'brs_id' in doc.metadata : 
-                bps_id = doc.metadata['brs_id']
-                type = 'brs'
-            
-            source_page = f"{doc.metadata['source'] } -+- {doc.metadata['page']}"
-            text = doc.page_content
-            if any(keyword.lower() in text.lower() for keyword in keywords):
-                if source_page not in sorce_page_unique :
-                    state["question"][index].rag_publikasi_brs.append(
-                        RagPublikasiBRS( 
-                            id = str(uuid.uuid4()),
-                            bps_id = str(bps_id),
-                            type = type,
-                            title = doc.metadata['title'], 
-                            halaman= int(doc.id.split(':')[-2])+1, 
-                            content = doc.page_content if int(doc.id.split(':')[-1]) == 0 else await get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
-                            rl_date = doc.metadata['rl_date'], 
-                            file_path = path_image,
-                            score= _score
-                        )
-                    )
-                    sorce_page_unique.append(source_page)
-
-        docs_table = await get_rag_data_table_arr(query, 5)
-        for doc, _score in docs_table:
-            text = doc.page_content
-            if any(keyword.lower() in text.lower() for keyword in keywords):
-                state["question"][index].rag_data.append(
-                    RagData( 
-                        id = str(uuid.uuid4()),
-                        judul = doc.metadata['judul'], 
-                        url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
-                        content = doc.page_content, 
-                        score= _score
-                    )
-                )
     return state
 
 async def rag_rerank(state):
