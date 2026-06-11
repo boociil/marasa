@@ -178,22 +178,17 @@ async def rag_search(state):
             bps_id = ""
             type = ""
 
-            path_image = ""
+            path_folder = str(doc.id).split(":")[0]
+            if path_folder.endswith(".pdf"):
+                path_folder = path_folder[:-4]
+            path_image = os.path.join(path_folder,str(doc.metadata['page'])+'.jpg')
 
             if 'pub_id' in doc.metadata : 
                 bps_id = doc.metadata['pub_id']
                 type = 'pub'
-
-                title = secure_filename(doc.metadata['rl_date']+'-'+str(doc.metadata['title']))
-                path_folder = os.path.join(BASE_DIR, os.getenv("IMAGES_FOLDER_Publikasi"), title.replace("/", "-"))
-                path_image = os.path.join(path_folder,str(doc.metadata['halaman'])+'.jpg')
             if 'brs_id' in doc.metadata : 
                 bps_id = doc.metadata['brs_id']
                 type = 'brs'
-
-                title = secure_filename(doc.metadata['rl_date']+'-'+str(doc.metadata['brs_id'])+'-'+str(doc.metadata['subj']))
-                path_folder = os.path.join(BASE_DIR, os.getenv("IMAGES_FOLDER_BRS"), title.replace("/", "-"))
-                path_image = os.path.join(path_folder,str(doc.metadata['halaman'])+'.jpg')
             
             source_page = f"{doc.metadata['source'] } -+- {doc.metadata['page']}"
             text = doc.page_content
@@ -297,6 +292,7 @@ Daftar knowledge chunks:
                         halaman= item.halaman,
                         content = item.content,
                         rl_date = item.rl_date,
+                        file_path= item.file_path,
                         score= item.score,
                     )
                 )
