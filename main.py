@@ -19,8 +19,8 @@ session_in_works.clear()
 def on_finish_callback(task, id_session: str) :
     try:
         task.result()
-        if session_in_works.get(f'kirim_regis__{id_session}', False):
-            session_in_works.pop(f'kirim_regis__{id_session}')
+        if session_in_works.get(f'session_in_works__{id_session}', False):
+            session_in_works.pop(f'session_in_works__{id_session}')
     except Exception:
         logger.exception("main_chat error")  
 
@@ -32,9 +32,9 @@ async def debounce_per_user_worker():
         #     logger.info(session_to_work)
         for item in session_to_work : 
             session_id = item.id
-            if session_in_works.get(f'kirim_regis__{session_id}', False):
+            if session_in_works.get(f'session_in_works__{session_id}', False):
                 continue
-            session_in_works.set(f'kirim_regis__{session_id}', True)
+            session_in_works.set(f'session_in_works__{session_id}', True)
 
             all_messages = list(await ChatMessage.select().where(ChatMessage.session == item).order_by(ChatMessage.created_at).aio_execute())
             logger.info(all_messages)

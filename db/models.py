@@ -1,6 +1,6 @@
 from peewee import CharField, IntegerField, DateTimeField, SmallIntegerField, BooleanField, ForeignKeyField, TextField, fn
 from db.db import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from wablas.send import send_end_session
 from _global import logger, session_in_works
 
@@ -87,7 +87,8 @@ async def load_last_messages(session: ChatSession):
     return content
 
 async def iddle_task_konsultasi():
-    twelve_hour_ago = datetime.now() - timedelta(hours=12)
+    one_hour_ago = datetime.now() - timedelta(hours=1)
+    hari_ini = date.today()
     idle_sessions = list(await ChatSession
         .select(
             ChatSession,
@@ -95,11 +96,12 @@ async def iddle_task_konsultasi():
         )
         .where(
             (ChatSession.layanan == 1) &
-            (ChatSession.is_done == False)
+            (ChatSession.is_done == False) & 
+            (ChatSession.created_at < hari_ini)
         )
         .join(ChatMessage)
         .group_by(ChatSession)
-        .having(fn.MAX(ChatMessage.created_at) < twelve_hour_ago)
+        .having(fn.MAX(ChatMessage.created_at) < one_hour_ago)
         .aio_execute()
     )
 
@@ -109,7 +111,7 @@ async def iddle_task_konsultasi():
 
 
 async def iddle_task_ai():
-    ten_minutes_ago = datetime.now() - timedelta(minutes=1)
+    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
     idle_sessions = list(await ChatSession
         .select(
             ChatSession,
@@ -126,8 +128,11 @@ async def iddle_task_ai():
     )
 
     for item in idle_sessions :
-        if session_in_works.get(f'kirim_regis__{item.id}', False):
+        if session_in_works.get(f'session_in_works__{item.id}', False):
             continue
+        if session_in_works.get(f'iddle_task_ai__{item.id}', False):
+            continue
+        session_in_works.set(f'iddle_task_ai__{item.id}', True)
         last_msg = list(await ChatMessage.select().where(ChatMessage.session == item.id).order_by(ChatMessage.created_at.desc()).aio_execute())
         
         if last_msg[0].role == 'bot' :
