@@ -43,7 +43,7 @@ def build_graph():
     return builder.compile()
    
 
-async def main_chat(graph, session: ChatSession, message: List[str]): 
+async def main_chat(graph, session: ChatSession, message: List[str], chat_history: List[str]): 
     user = await get_user_by_phone(session.phone)
 
     state = {
@@ -56,7 +56,7 @@ async def main_chat(graph, session: ChatSession, message: List[str]):
         "question": [],
 
         "new_chat": message,
-        "chat_history": [],
+        "chat_history": chat_history,
     }
 
     

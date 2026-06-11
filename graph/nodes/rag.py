@@ -364,7 +364,7 @@ async def rag_answer(state):
                     },
                 })
 
-                # logger.info(hasil_txt)
+                logger.info(hasil_txt)
 
                 hasil = json.loads(hasil_txt.replace("```",""))
                 break
