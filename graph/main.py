@@ -9,6 +9,7 @@ from typing import List, Dict
 from db.models import get_user_by_phone
 from wablas.send import send_simple_text, send_simple_image
 from _global import logger
+import asyncio
 
 # 1. LOAD ENV (Parent Folder)
 load_dotenv(find_dotenv())
@@ -97,6 +98,7 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
             if item_answer.file_path not in path_ori :
                 await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
                 path_ori.append(item_answer.file_path)
+        await asyncio.sleep(0.5)
 
     for item_ques in result['question']:
         for item_answer in item_ques.answer:

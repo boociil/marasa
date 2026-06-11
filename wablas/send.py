@@ -3,7 +3,7 @@ import os
 import base64
 from dotenv import load_dotenv, find_dotenv
 from _global import logger
-import httpx
+import httpx, json
 
 load_dotenv(find_dotenv())
 
@@ -42,32 +42,29 @@ async def send_simple_text(phone: str, message:str) :
 async def send_simple_image(phone: str, caption:str, file_path: str) :
 
     # Gather file metadata to simulate PHP's $_FILES array
-    filename = os.path.basename(file_path)
-    file_size = os.path.getsize(file_path)
-    mime_type, _ = mimetypes.guess_type(file_path)
-
-    # 1. Read and base64 encode the file
+    # Membaca file dan mengubahnya menjadi base64
     with open(file_path, "rb") as image_file:
         file_content = image_file.read()
-        # Decode to utf-8 string so it can be sent properly in the form payload
-        encoded_file = base64.b64encode(file_content).decode('utf-8')
+        file_base64 = base64.b64encode(file_content).decode('utf-8')
 
-
-    # 3. Prepare the parameters
-    params = {
-        'phone': phone, # Untuk bulk message gunakan koma: '081XXXXXX91,0850011xxx'
-        'caption': caption,       # Kosongkan atau gunakan None jika tidak ada caption
-        'file': encoded_file,
-        'data': {
-            "name": filename,
-            "type": mime_type or "application/octet-stream",
-            "tmp_name": file_path, 
-            "error": 0,
-            "size": file_size
-        }
+    # Simulasi metadata $_FILES['upload_file'] dari PHP
+    file_info = {
+        "name": os.path.basename(file_path),
+        "type": "image/jpeg", # Sesuaikan dengan mimetype file Anda
+        "tmp_name": file_path,
+        "error": 0,
+        "size": os.path.getsize(file_path)
     }
 
-    # 4. HTTP Headers
+    # Payload data (dikirim sebagai form-urlencoded)
+    data = {
+        'phone': phone,
+        # Untuk bulk message gunakan koma: '081XXXXXX91,0850011xxx'
+        'caption': caption, 
+        'file': file_base64,
+        'data': json.dumps(file_info)
+    }
+
     headers = {
         "Authorization": f"{TOKEN}.{SECRET_KEY}"
     }
@@ -77,7 +74,7 @@ async def send_simple_image(phone: str, caption:str, file_path: str) :
     while True:
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(url, params=params)
+                response = await client.post(url, headers=headers, data=data)
                 response.raise_for_status()
                 
                 # (Opsional) return response jika berhasil

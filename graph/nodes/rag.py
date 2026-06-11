@@ -9,6 +9,7 @@ import json
 import unicodedata
 from langchain_community.tools import DuckDuckGoSearchResults
 from _global import logger, BASE_DIR
+from pathlib import Path
 
 load_dotenv(find_dotenv()) 
 
@@ -158,19 +159,24 @@ async def rag_search(state):
         query = state["question"][index].rag_ques
         keywords = state["question"][index].keyword
 
-        search = DuckDuckGoSearchResults(output_format="list")
-        logger.info(f"site:bps.go.id {', '.join(query)}")
-        results_list = await search.ainvoke(f"site:bps.go.id {', '.join(query)}")
+        while True:
+            try :
+                search = DuckDuckGoSearchResults(output_format="list")
+                logger.info(f"site:bps.go.id {', '.join(query)}")
+                results_list = await search.ainvoke(f"site:bps.go.id {', '.join(query)}")
 
-        for res in results_list:
-            state["question"][index].ddgs.append(
-                DDGS( 
-                    id = str(uuid.uuid4()),
-                    snippet = res['snippet'] ,
-                    title = res['title'],
-                    link = res['link'],
-                )
-            )
+                for res in results_list:
+                    state["question"][index].ddgs.append(
+                        DDGS( 
+                            id = str(uuid.uuid4()),
+                            snippet = res['snippet'] ,
+                            title = res['title'],
+                            link = res['link'],
+                        )
+                    )
+                break
+            except Exception as e:
+                logger.info(e)
 
         docs_pdf = await get_rag_data_arr(query, 5)
         sorce_page_unique = []
@@ -181,7 +187,9 @@ async def rag_search(state):
             path_folder = str(doc.id).split(":")[0]
             if path_folder.endswith(".pdf"):
                 path_folder = path_folder[:-4]
-            path_image = os.path.join(path_folder,str(doc.metadata['page'])+'.jpg')
+            path_image = os.path.join(BASE_DIR, path_folder,str(int(doc.metadata['page'])+1)+'.jpg')
+            path_image = path_image.replace("/PDF_ALL/","/IMAGES/")
+            path_image = str(Path(path_image.replace("\\", "/")))
 
             if 'pub_id' in doc.metadata : 
                 bps_id = doc.metadata['pub_id']
@@ -380,6 +388,7 @@ async def rag_answer(state):
                 logger.info(e)
 
         for item_sitasi in hasil['sitasi'] :
+            logger.info(chunks_dict[item_sitasi].print())
             if isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
                 state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
         

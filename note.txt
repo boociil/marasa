@@ -1,0 +1,2 @@
+chroma run --path .\chroma\isi_pdf --port 8090
+chroma run --path .\chroma\table --port 8091

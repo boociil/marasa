@@ -39,7 +39,7 @@ PENGGUNAAN ID SUMBER (SITASI)
 =====================
 Setiap potong informasi dalam <konteks> akan memiliki metadata berupa `id` (string). 
 - Kamu WAJIB melampirkan array dari `id` dokumen yang menjadi rujukan untuk setiap data yang kamu sajikan.
-- Jangan asal mengembalikan sitasi, pilih yang benar-benar terpakai dijawaban
+- Jangan asal mengembalikan sitasi, pilih yang benar-benar relevan dengan pertanyaan dan secara langsung kamu gunakan untuk menyusun jawaban
 - Contoh format ID: ["doc_123", "bps_001"].
 
 =====================

@@ -1,21 +1,38 @@
 from langchain_chroma import Chroma
 from populate.get_embedding_function import get_embedding_function
 from dotenv import load_dotenv, find_dotenv
-import os
-from loguru import logger
 from diskcache import Cache
+import chromadb
+from loguru import logger
+import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "log")
 
-
 load_dotenv(find_dotenv()) 
 
 def get_vectorstore_pdf():
-    return Chroma(persist_directory= os.path.join(BASE_DIR, os.getenv('CHROMA_PATH_ISI_PDF')), embedding_function=get_embedding_function())
+    CHROMA_HOST = "localhost"
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT_ISI_PDF", 8000))
+
+    chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+
+    return Chroma(
+        client=chroma_client,
+        embedding_function=get_embedding_function() 
+    )
+
 
 def get_vectorstore_table():
-    return Chroma(persist_directory= os.path.join(BASE_DIR, os.getenv('CHROMA_PATH_TABLE')), embedding_function=get_embedding_function())
+    CHROMA_HOST = "localhost"
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT_TABLE", 8000))
+
+    chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+
+    return Chroma(
+        client=chroma_client,
+        embedding_function=get_embedding_function() 
+    )
 
 
 vectorstore_isi_pdf = get_vectorstore_pdf()
