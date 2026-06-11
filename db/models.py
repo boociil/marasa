@@ -2,7 +2,7 @@ from peewee import CharField, IntegerField, DateTimeField, SmallIntegerField, Bo
 from db.db import BaseModel
 from datetime import datetime, timedelta, date
 from wablas.send import send_end_session
-from _global import logger, session_in_works
+from _global import logger
 
 class User(BaseModel):
     nama = CharField(max_length=255)
@@ -110,7 +110,7 @@ async def iddle_task_konsultasi():
         await item.aio_save()
 
 
-async def iddle_task_ai():
+async def iddle_task_ai(session_in_works_id):
     ten_minutes_ago = datetime.now() - timedelta(minutes=10)
     idle_sessions = list(await ChatSession
         .select(
@@ -128,11 +128,8 @@ async def iddle_task_ai():
     )
 
     for item in idle_sessions :
-        if session_in_works.get(f'session_in_works__{item.id}', False):
+        if item.id in session_in_works_id:
             continue
-        if session_in_works.get(f'iddle_task_ai__{item.id}', False):
-            continue
-        session_in_works.set(f'iddle_task_ai__{item.id}', True)
         last_msg = list(await ChatMessage.select().where(ChatMessage.session == item.id).order_by(ChatMessage.created_at.desc()).aio_execute())
         
         if last_msg[0].role == 'bot' :
@@ -141,7 +138,7 @@ async def iddle_task_ai():
             await send_end_session(item.phone)
 
 
-async def get_active_session_not_arr():
+async def get_active_session_not_arr(session_in_works_id):
     five_second_ago = datetime.now() - timedelta(seconds=5)
 
     last_msg_subquery = (ChatMessage
@@ -156,7 +153,8 @@ async def get_active_session_not_arr():
                 (ChatSession.is_done == False) &
                 (ChatMessage.id << last_msg_subquery) & # Pastikan ini pesan terakhir
                 (ChatMessage.role == 'user') &          # Role terakhir adalah user
-                (ChatMessage.created_at < five_second_ago)    # Sudah lewat 5 detik
+                (ChatMessage.created_at < five_second_ago) &    # Sudah lewat 5 detik
+                (ChatSession.id.not_in(session_in_works_id))
             ))
         .aio_execute()
     )

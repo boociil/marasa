@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from graph.main import build_graph, main_chat
 from dotenv import load_dotenv
 import asyncio
-from _global import logger, session_in_works
+from _global import logger
 from db.models import iddle_task_ai, iddle_task_konsultasi, ChatMessage, close_24_hour, get_active_session_not_arr
 from db.model_wablas import WablasIncomingMessage
 from db.models import get_user_by_phone
@@ -14,27 +14,27 @@ from b_graph.start_layanan import start_layanan
 load_dotenv()
 graph = build_graph()
 
-session_in_works.clear()
+session_in_works_id = []
 
 def on_finish_callback(task, id_session: str) :
     try:
         task.result()
-        if session_in_works.get(f'session_in_works__{id_session}', False):
-            session_in_works.pop(f'session_in_works__{id_session}')
+        if id_session in session_in_works_id:
+            session_in_works_id.remove(id_session)
     except Exception:
         logger.exception("main_chat error")  
 
 async def debounce_per_user_worker():    
     while True:
         await asyncio.sleep(1) # Loop cek setiap 1 detik
-        session_to_work = await get_active_session_not_arr()
-        # if len(session_to_work) > 0 :
-        #     logger.info(session_to_work)
+        if len(session_in_works_id) >= 4 :
+            continue
+        session_to_work = await get_active_session_not_arr(session_in_works_id)
         for item in session_to_work : 
             session_id = item.id
-            if session_in_works.get(f'session_in_works__{session_id}', False):
+            if session_id in session_in_works_id:
                 continue
-            session_in_works.set(f'session_in_works__{session_id}', True)
+            session_in_works_id.append(session_id)
 
             all_messages = list(await ChatMessage.select().where(ChatMessage.session == item).order_by(ChatMessage.created_at).aio_execute())
             older_message = []
@@ -59,7 +59,7 @@ async def debounce_per_user_worker():
 async def process_per_minute():    
     while True:
         await asyncio.sleep(60) # per menit
-        asyncio.create_task(iddle_task_ai())
+        asyncio.create_task(iddle_task_ai(session_in_works_id))
         asyncio.create_task(iddle_task_konsultasi())
 
 # 3. Lifespan Manager (Mengatur startup & shutdown)

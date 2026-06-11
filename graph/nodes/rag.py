@@ -8,7 +8,7 @@ import uuid
 import json
 import unicodedata
 from langchain_community.tools import DuckDuckGoSearchResults
-from _global import logger
+from _global import logger, BASE_DIR
 
 load_dotenv(find_dotenv()) 
 
@@ -177,12 +177,23 @@ async def rag_search(state):
         for doc, _score in docs_pdf:
             bps_id = ""
             type = ""
+
+            path_image = ""
+
             if 'pub_id' in doc.metadata : 
                 bps_id = doc.metadata['pub_id']
                 type = 'pub'
+
+                title = secure_filename(doc.metadata['rl_date']+'-'+str(doc.metadata['title']))
+                path_folder = os.path.join(BASE_DIR, os.getenv("IMAGES_FOLDER_Publikasi"), title.replace("/", "-"))
+                path_image = os.path.join(path_folder,str(doc.metadata['halaman'])+'.jpg')
             if 'brs_id' in doc.metadata : 
                 bps_id = doc.metadata['brs_id']
                 type = 'brs'
+
+                title = secure_filename(doc.metadata['rl_date']+'-'+str(doc.metadata['brs_id'])+'-'+str(doc.metadata['subj']))
+                path_folder = os.path.join(BASE_DIR, os.getenv("IMAGES_FOLDER_BRS"), title.replace("/", "-"))
+                path_image = os.path.join(path_folder,str(doc.metadata['halaman'])+'.jpg')
             
             source_page = f"{doc.metadata['source'] } -+- {doc.metadata['page']}"
             text = doc.page_content
@@ -197,6 +208,7 @@ async def rag_search(state):
                             halaman= int(doc.id.split(':')[-2])+1, 
                             content = await get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']), 
                             rl_date = doc.metadata['rl_date'], 
+                            file_path = path_image,
                             score= _score
                         )
                     )
@@ -372,24 +384,12 @@ async def rag_answer(state):
                 logger.info(e)
 
         for item_sitasi in hasil['sitasi'] :
-            if isinstance(item_sitasi, RagPublikasiBRS) :
-                state["question"][index].answer.append(AnswerModel(type="file", text=f"{item_sitasi.title}, Hal {item_sitasi.halaman}", file_path= findImagePathPublikasiBRS(item_sitasi)))
+            if isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
+                state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
         
         state["question"][index].answer.append(AnswerModel(type="text", text=hasil['jawaban'], sitasi=hasil['sitasi']))
         
     return state
-
-def findImagePathPublikasiBRS(item: RagPublikasiBRS):
-    if item.type == 'pub': #publikas
-        title = secure_filename(item.rl_date+'-'+str(item.title))
-        path_folder = os.path.join(os.getenv("IMAGES_FOLDER_Publikasi"), title.replace("/", "-"))
-        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg')
-        return path_image
-    if item.type == 'brs':
-        title = secure_filename(item.rl_date+'-'+str(item.bps_id))
-        path_folder = os.path.join(os.getenv("IMAGES_FOLDER_BRS"), title.replace("/", "-"))
-        path_image = os.path.join(path_folder,str(item.halaman)+'.jpg')
-        return path_image
 
 INVALID_FILE_CHARS = '/\\?%*:|"<>' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
 

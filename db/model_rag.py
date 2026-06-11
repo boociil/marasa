@@ -11,15 +11,26 @@ class RagPublikasiBRS(BaseModel):
     halaman: int
     content: str
     rl_date: str
+    file_path: str
     score: float
     def print(self):
         rl_date_split = self.rl_date.split("-")
-        return f"""ID Pengetahuan :  {self.id}
+        if self.type == 'pub' :
+            return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
 content : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
+Score : {self.score}
+"""
+        elif  self.type == 'brs' : 
+            return f"""ID Pengetahuan :  {self.id}
+jenis : internal
+Judul : {self.title}
+content : {self.content}
+Release : {self.rl_date}
+Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
 """
 
