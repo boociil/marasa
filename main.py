@@ -199,9 +199,6 @@ def checkHpGroup(phone):
 ,'6282210467478'
 ,'6282319192651'
 ,'6288224735330']:
-        if phone == '6282195195502' :
-            return True
-        else :
-            return False
+        return True
     else:
         return False
