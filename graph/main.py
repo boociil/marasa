@@ -45,76 +45,87 @@ def build_graph():
    
 
 async def main_chat(graph, session: ChatSession, message: List[str], chat_history: List[str]): 
-    user = await get_user_by_phone(session.phone)
+    try:
+        user = await get_user_by_phone(session.phone)
 
-    state = {
-        "check": 'TANYA',
+        state = {
+            "check": 'TANYA',
 
-        "nama": user.nama,
-        "nama_lengkap": user.nama_lengkap,
-        "notelp": session.phone,
+            "nama": user.nama,
+            "nama_lengkap": user.nama_lengkap,
+            "notelp": session.phone,
 
-        "question": [],
+            "question": [],
 
-        "new_chat": message,
-        "chat_history": chat_history,
-    }
+            "new_chat": message,
+            "chat_history": chat_history,
+        }
 
+        
+        result = await graph.ainvoke(state)
+
+        if result['check'] == 'PUAS' :
+            await send_simple_text(user.notelp, 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊')
+            session.is_done = True;
+            await session.aio_save()
+            return
+        elif result['check'] == 'ADMIN' :
+            await send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
+            session.is_done = True;
+            await session.aio_save()
+            return
+        elif  result['check'] == 'OFF' :
+            await send_simple_text(user.notelp, 'Waduh, maaf banget nih, sepertinya pertanyaan tadi di luar topik statistik BPS. Yuk, kita kembali ke jalur utama!')
+            session.is_done = True;
+            await session.aio_save()
+            return
+        #TANYA
     
-    result = await graph.ainvoke(state)
+        answer = []
+        for item_ques in result['question']:
+            for item_answer in item_ques.answer:
+                answer.append(item_answer)
+                logger.info(item_answer.text)
+                logger.info("")
 
-    if result['check'] == 'PUAS' :
-        await send_simple_text(user.notelp, 'Terima kasih sudah menghubungi *Marasa by BPS Sulbar*. Jangan ragu hubungi kami lagi jika butuh bantuan lainnya. 😊')
-        session.is_done = True;
-        await session.aio_save()
-        return
-    elif result['check'] == 'ADMIN' :
-        await send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
-        session.is_done = True;
-        await session.aio_save()
-        return
-    elif  result['check'] == 'OFF' :
-        await send_simple_text(user.notelp, 'Waduh, maaf banget nih, sepertinya pertanyaan tadi di luar topik statistik BPS. Yuk, kita kembali ke jalur utama!')
-        session.is_done = True;
-        await session.aio_save()
-        return
-    #TANYA
- 
-    answer = []
-    for item_ques in result['question']:
-        for item_answer in item_ques.answer:
-            answer.append(item_answer)
-            logger.info(item_answer.text)
-            logger.info("")
+        if len(result['question']) > 0 :
+            answer.append(AnswerModel(type="text", text=ai_disclaimen))
 
-    if len(result['question']) > 0 :
-        answer.append(AnswerModel(type="text", text=ai_disclaimen))
-
-    path_ori = []
-    for item_answer in answer:
-        if item_answer.file_path is None :
-            await send_simple_text(user.notelp, item_answer.text)
-        else :
-            if item_answer.file_path not in path_ori :
-                await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
-                path_ori.append(item_answer.file_path)
-        await asyncio.sleep(0.5)
-
-    for item_ques in result['question']:
-        for item_answer in item_ques.answer:
+        path_ori = []
+        for item_answer in answer:
             if item_answer.file_path is None :
-                await ChatMessage.aio_create(
-                    session = session,
-                    role = "bot",
-                    content = item_answer.text,
-                )
+                await send_simple_text(user.notelp, item_answer.text)
             else :
-                await ChatMessage.aio_create(
-                    session = session,
-                    role = "bot",
-                    content =  f"{item_answer.file_path} {item_answer.text}",
-                )
+                if item_answer.file_path not in path_ori :
+                    await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
+                    path_ori.append(item_answer.file_path)
+            await asyncio.sleep(0.5)
 
+        for item_ques in result['question']:
+            for item_answer in item_ques.answer:
+                if item_answer.file_path is None :
+                    await ChatMessage.aio_create(
+                        session = session,
+                        role = "bot",
+                        content = item_answer.text,
+                    )
+                else :
+                    await ChatMessage.aio_create(
+                        session = session,
+                        role = "bot",
+                        content =  f"{item_answer.file_path} {item_answer.text}",
+                    )
+    except Exception as e:
+        logger.exception("Error saat menjalankan graph")
+        logger.exception(f"Terjadi error: {e}")
+        await ChatMessage.aio_create(
+            session = session,
+            role = "bot",
+            content = "Mohon maaf, terjadi kendala saat memproses permintaan Anda🙏. Silakan coba beberapa saat lagi. Terima kasih atas pengertiannya. 😊",
+        )
+        await send_simple_text(user.notelp, 'Mohon maaf, terjadi kendala saat memproses permintaan Anda🙏. Silakan coba beberapa saat lagi. Terima kasih atas pengertiannya. 😊')
+        session.is_done = True;
+        await session.aio_save()
 
 async def main_chat_cmd(graph, text: list[str], chat_history: list[str]): 
     logger.info(text)

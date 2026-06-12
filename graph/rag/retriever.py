@@ -143,7 +143,10 @@ async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
     return return_value
 
 async def get_ddgs_arr(query):
+    gagal = 0
     while True:
+        if gagal == 2 :
+            return []
         try :
             search = DuckDuckGoSearchResults(output_format="list")
             logger.info(f"site:bps.go.id {', '.join(query)}")
@@ -161,3 +164,4 @@ async def get_ddgs_arr(query):
             return return_value
         except Exception as e:
             logger.info(e)
+            gagal += 1

@@ -17,13 +17,17 @@ TANYA: Jika user bertanya tentang data statistik, metodologi, atau layanan BPS l
 ADMIN: Jika user secara eksplisit meminta untuk berbicara dengan manusia, admin, CS, atau staf.
 OFF: Jika pesan di luar konteks layanan BPS, bersifat ofensif, tidak relevan (spam), atau melanggar kebijakan keamanan."""
     hasil = "TANYA"
+    attmpt = 1
     while True:
-        logger.info(prompt)
+        if attmpt == 4 :
+            raise Exception("Terjadi kesalahan")
+
         respomse_text = await llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'), {})
         logger.info(respomse_text)
         if respomse_text.upper() in ['PUAS', 'TANYA', 'ADMIN', 'OFF'] :
             hasil = respomse_text
             break
+        attmpt += 1
 
     state['check'] = hasil
     return state

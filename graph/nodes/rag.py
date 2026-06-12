@@ -136,7 +136,10 @@ Teks Pengguna:
 """
     extract_rag_json = []
 
+    attmpt = 1
     while True:
+        if attmpt == 4 :
+            raise Exception("Terjadi kesalahan")
         try :
             extract_rag = await llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
                 "response_mime_type": "application/json",
@@ -168,6 +171,7 @@ Teks Pengguna:
             break
         except Exception as e:
             logger.info(e)
+            attmpt += 1
     logger.info(extract_rag_json)
     ques_arr = []
     for item in extract_rag_json:
@@ -235,7 +239,10 @@ Daftar knowledge chunks:
 {chunks}"""
         
         id_keep_rag =[]
+        attmpt = 1
         while True:
+            if attmpt == 4 :
+                raise Exception("Terjadi kesalahan")
             try :
                 id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
                     "response_mime_type": "application/json",
@@ -250,7 +257,8 @@ Daftar knowledge chunks:
                 id_keep_rag = json.loads(id_keep_rag_txt.replace("```",""))
                 break
             except Exception as e:
-                logger.info
+                logger.info(e)
+                attmpt += 1
 
 
         for item in state["question"][index].rag_publikasi_brs :
@@ -322,7 +330,10 @@ async def rag_answer(state):
         )
 
         hasil = None
+        attmpt = 1
         while True:
+            if attmpt == 4 :
+                raise Exception("Terjadi kesalahan")
             try :
                 hasil_txt = await llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'),config={
                     "response_mime_type": "application/json",
@@ -350,6 +361,7 @@ async def rag_answer(state):
                 break
             except Exception as e:
                 logger.info(e)
+                attmpt += 1
 
         for item_sitasi in hasil['sitasi'] :
             logger.info(chunks_dict[item_sitasi].print())
