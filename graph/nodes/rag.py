@@ -1,7 +1,7 @@
-from graph.rag.retriever import  get_rag_data_arr, get_rag_data_table_arr, get_ddgs_arr
+from graph.rag.retriever import  get_rag_data_arr, get_rag_data_table_arr, get_rag_rilis_publikasi, get_ddgs_arr
 from graph.text import LLM_PROMPT
 from graph.llm import llm_query
-from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, AnswerModel, DDGS
+from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, RagRilisPublikasi, AnswerModel, DDGS
 from dotenv import load_dotenv, find_dotenv
 import os
 import json
@@ -18,95 +18,99 @@ async def pecah_question_and_transform_untuk_rag(state) :
 
     new_chat = "\n".join(state["new_chat"])
 
-    prompt = f"""
-Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
+    prompt = f"""Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
 
-Tujuan Anda:
-Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan beberapa variasi kueri pencarian yang dioptimalkan untuk masing-masing pertanyaan tersebut guna memaksimalkan relevansi dokumen (seperti publikasi, tabel statis, atau metadata) yang akan ditarik oleh sistem.
-Tambahkan pula array keyword yang harus ada pada saat query
+TUJUAN:
+Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan variasi kueri pencarian yang dioptimalkan untuk memaksimalkan relevansi dokumen (publikasi, tabel statis, atau metadata) yang ditarik oleh sistem. Hasilkan juga array kata kunci (keyword) spesifik.
 
-Optimasi Pertanyaan asli :
-- Jika pertanyaan asli mencari data dan TIDAK ada konteks wilayah, tambahkan kata kunci "Sulawesi Barat".
-- Jika pertanyaan asli mencari data dan TIDAK ada konteks waktu, tambahkan tahun terbaru "2025" dan "2026".
+ATURAN EKSTRAKSI PERTANYAAN:
+1. Pertahankan konteks utama dan bahasa asli dari pertanyaan.
+2. Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
+3. Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
+4. PECAH PERTANYAAN MULTI-INDIKATOR (SANGAT PENTING): Jika teks meminta beberapa indikator atau topik yang tidak saling berhubungan (misalnya: "data x, y, dan z"), Anda WAJIB memecahnya menjadi beberapa objek JSON (pertanyaan) yang terpisah untuk masing-masing indikator.
+5. Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
+6. Gunakan riwayat percakapan untuk melengkapi konteks kalimat (abaikan jika tidak relevan dengan input saat ini).
 
-Aturan Ekstraksi Pertanyaan & Kata Kunci:
-- Pertahankan konteks utama pertanyaan.
-- Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
-- Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
-- Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
-- Pertahankan bahasa asli pertanyaan.
-- Gunakan riwayat percakapan untuk melengkapi konteks kalimat, namun abaikan jika tidak relevan dengan teks pengguna saat ini.
-- Ekstrak kata kunci (keyword) utama dari pertanyaan. Setiap item dalam array kata kunci HARUS berupa tepat 1 (satu) kata tunggal. Jika terdapat frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
-- Ekstrak kata kunci (keyword) utama dari pertanyaan. Kata kunci harus berupa istilah substansial yang searchable (seperti nama variabel, indikator, konsep, wilayah, atau entitas).
-- ABAIKAN kata-kata kuantitas, agregasi, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa").
-- usahakan keyword 1 kata
 
-Aturan Optimasi Kueri Pencarian RAG:
-- Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan yang diekstrak.
-- Buat lebih dari 1 kueri pencarian jika ada beberapa indikator yang dicari (Misal: jika mencari "hubungan variabel A dan B", buat kueri untuk A, kueri untuk B, dan kueri untuk hubungan keduanya).
-- LAKUKAN EKSPANSI TERMINOLOGI STATISTIK: Terjemahkan bahasa awam ke dalam istilah resmi Badan Pusat Statistik (BPS) pada kueri pencarian. contoh :
-    A. Ekonomi Makro & Kesejahteraan:
-        1. Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi.
-        2. Daya beli / pengeluaran warga ➔ PKRT (Pengeluaran Konsumsi Rumah Tangga), Pengeluaran per Kapita.
-        3. Inflasi / harga naik ➔ IHK (Indeks Harga Konsumen).
-        4. Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin (P0), Garis Kemiskinan.
-        5. Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan.
-    B. Ketenagakerjaan:
-        1. Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka).
-        2. Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK.
-        3. Orang kerja ➔ Penduduk Bekerja.
-    C. Sosial, Pendidikan, Kesehatan:
-        1. Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia).
-        2. Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup).
-        3. Pendidikan / putus sekolah ➔ RLS (Rata-rata Lama Sekolah), HLS (Harapan Lama Sekolah).
-    D. Pertanian & Kesejahteraan Petani:
-        1. Kesejahteraan petani ➔ NTP (Nilai Tukar Petani), NTUP (Nilai Tukar Usaha Pertanian).
-        2. Hasil panen / produksi tani ➔ Luas Panen, Produktivitas, Produksi.
-    E. Bahasa Sektor / Lapangan Usaha Eksekutif:
-        a. Sektor industri / pabrik / manufaktur ➔ PDRB Lapangan Usaha Industri Pengolahan.
-        b.Pariwisata / hotel / restoran / pengunjung ➔ PDRB Lapangan Usaha Penyediaan Akomodasi dan Makan Minum, Tingkat Penghunian Kamar (TPK), Jumlah Wisatawan.
-        c. Tambang / galian ➔ PDRB Lapangan Usaha Pertambangan dan Penggalian.
-        d. Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran.
-        e. Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi.
-        f. Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan.
-- Pertahankan bahasa asli.
-- Perluas kata kunci (gunakan sinonim atau kepanjangan dari singkatan, misal: TPAK menjadi Tingkat Partisipasi Angkatan Kerja).
-- Hapus kata-kata percakapan atau basa-basi (seperti "tolong", "halo", "carikan").
-- Kueri harus mandiri (tidak bergantung pada referensi kata ganti seperti "itu" atau "dia").
-- JANGAN mencoba menjawab pertanyaan, Anda hanya bertugas membuat kueri.
-- Jika pertanyaan mencari data dan TIDAK ada konteks wilayah, tambahkan kata kunci "Sulawesi Barat".
-- Jika pertanyaan mencari data dan TIDAK ada konteks waktu, tambahkan tahun terbaru "2025" dan "2026".
+ATURAN EKSTRAKSI KATA KUNCI (KEYWORD):
+1. Ekstrak kata kunci utama yang substansial dan searchable (seperti nama variabel, indikator, konsep, wilayah, entitas, atau periode data).
+2. Setiap item dalam array keyword HARUS tepat 1 (satu) kata tunggal. Jika ada frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
+3. Pastikan kata kunci periode waktu/tahun dimasukkan ke dalam array jika ada atau jika ditambahkan secara otomatis.
+4. ABAIKAN kata kuantitas, agregasi, kata percakapan, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa", "tolong", "carikan").
 
-Aturan Output (SANGAT KETAT):
-- Anda HANYA boleh merespons dalam format array JSON yang valid.
-- Tidak boleh ada teks tambahan, penjelasan, atau blok *markdown* di luar JSON.
+ATURAN OPTIMASI KUERI PENCARIAN RAG:
+1. Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan. Kueri tidak boleh bergantung pada referensi kata ganti ("itu", "dia").
+2. LARANGAN KERAS VARIASI SUPERFISIAL: JANGAN PERNAH membuat variasi kueri yang dasarnya adalah kalimat yang sama namun hanya ditambahi kata pengisi/basa-basi di depannya (seperti: "data", "angka", "persentase", "statistik", "jumlah", atau "daftar").
+3. PENANGANAN VARIABEL HUBUNGAN: Jika teks mencari HUBUNGAN antar variabel (misal: "hubungan a dan b"), jadikan SATU objek JSON dengan variasi kueri yang mencakup masing-masing variabel dan kueri hubungan keduanya. JANGAN dipecah jika konteksnya adalah korelasi/hubungan.
+4. KONTEKS WILAYAH & WAKTU OTOMATIS: Jika pertanyaan mencari data dan TIDAK ada konteks wilayah, WAJIB tambahkan kata "Sulawesi Barat". Jika TIDAK ada konteks waktu, WAJIB tambahkan tahun terbaru "2025" dan "2026".
+5. EKSPANSI TERMINOLOGI STATISTIK (BPS): Terjemahkan bahasa awam ke istilah resmi BPS, dan perluas singkatan:
+   A. Ekonomi Makro & Kesejahteraan:
+      - Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi
+      - Daya beli / pengeluaran warga ➔ PKRT (Pengeluaran Konsumsi Rumah Tangga), Pengeluaran per Kapita
+      - Inflasi / harga naik ➔ IHK (Indeks Harga Konsumen)
+      - Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin (P0), Garis Kemiskinan
+      - Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan
+   B. Ketenagakerjaan:
+      - Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka)
+      - Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK (Tingkat Partisipasi Angkatan Kerja)
+      - Orang kerja ➔ Penduduk Bekerja
+   C. Sosial, Pendidikan, Kesehatan:
+      - Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia)
+      - Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup)
+      - Pendidikan / putus sekolah ➔ RLS (Rata-rata Lama Sekolah), HLS (Harapan Lama Sekolah)
+   D. Pertanian & Kesejahteraan Petani:
+      - Kesejahteraan petani ➔ NTP (Nilai Tukar Petani), NTUP (Nilai Tukar Usaha Pertanian)
+      - Hasil panen / produksi tani ➔ Luas Panen, Produktivitas, Produksi
+   E. Bahasa Sektor / Lapangan Usaha Eksekutif:
+      - Industri / pabrik / manufaktur ➔ PDRB Lapangan Usaha Industri Pengolahan
+      - Pariwisata / hotel / restoran / pengunjung ➔ PDRB Lapangan Usaha Penyediaan Akomodasi dan Makan Minum, Tingkat Penghunian Kamar (TPK), Jumlah Wisatawan
+      - Tambang / galian ➔ PDRB Lapangan Usaha Pertambangan dan Penggalian
+      - Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran
+      - Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi
+      - Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan
+6. JANGAN mencoba menjawab pertanyaan, tugas Anda HANYA membuat kueri.
+
+ATURAN OUTPUT (SANGAT KETAT):
+- Anda HANYA boleh merespons dengan format array JSON yang valid.
+- TIDAK BOLEH ada teks tambahan, penjelasan, atau blok markdown di luar array JSON. Output harus murni teks JSON.
 - Jika tidak ada pertanyaan yang ditemukan sama sekali dalam teks, kembalikan array kosong: []
 
-Format JSON yang diharapkan:
+FORMAT JSON YANG DIHARAPKAN:
 [
   {{
     "pertanyaan_asli": "Teks pertanyaan yang telah dirapikan",
     "kueri_pencarian": [
       "variasi kueri kata kunci panjang 1",
-      "variasi kueri kata kunci panjang 2",
-      "variasi kueri kata kunci spesifik 3",
-      dst..
-    ]
+      "variasi kueri kata kunci panjang 2"
+    ],
     "keyword": [
-      "keyword 1",
-      "keyword 2",
-      "keyword 3",
-      dst..
+      "keyword1",
+      "keyword2"
     ]
   }}
 ]
 
-contoh salah:
-[{{'pertanyaan_asli': 'Jumlah x?', 'kueri_pencarian': ['jumlah x Sulawesi Barat 2025 2026', 'total x Sulawesi Barat 2025 2026', 'x Sulawesi Barat 2025 2026'], keyword: [x]}}]
+CONTOH SALAH (Jangan Lakukan Ini):
+[
+  {{
+    "pertanyaan_asli": "Jumlah x?",
+    "kueri_pencarian": ["jumlah x Sulawesi Barat 2025 2026", "total x Sulawesi Barat 2025 2026", "x Sulawesi Barat 2025 2026"],
+    "keyword": ["x"]
+  }}
+]
 
-salah kaerana pada dasarnya sama
+[
+  {{
+    "pertanyaan_asli": "data angka x ke atas menurut kabupaten/kota tahun 2019-2024",
+    "kueri_pencarian": ["angka x ke atas Sulawesi Barat 2019-2024", "persentase penduduk x ke atas kabupaten kota Sulawesi Barat 2019-2024", "statistik x Sulawesi Barat 2019-2024"],
+    "keyword": ["angka", "x", "persentase", "x", "statistik", "x"]
+  }}
+]
 
-contoh benar:
+(ALASAN SALAH: Ketiga kueri di atas pada dasarnya adalah kalimat yang persis sama, hanya ditambahi kata filler seperti "angka", "persentase penduduk", dan "statistik pendidikan". Ini sangat tidak berguna untuk sistem RAG. Keyword juga kehilangan konteks tahun dan wilayah).
+
+
+CONTOH BENAR:
 [
   {{
     "pertanyaan_asli": "data TPAK dan persentase kemiskinan",
@@ -114,16 +118,55 @@ contoh benar:
       "Tingkat Partisipasi Angkatan Kerja TPAK Sulawesi Barat 2025 2026",
       "persentase penduduk miskin kemiskinan Sulawesi Barat 2025 2026"
     ],
-    keyword: ['TPAK', 'kemiskinan']
+    "keyword": [
+      "TPAK",
+      "kemiskinan",
+      "Sulawesi",
+      "Barat",
+      "2025",
+      "2026"
+    ]
   }},
   {{
     "pertanyaan_asli": "hubungannya data TPAK dan persentase kemiskinan dengan pertumbuhan ekonomi",
     "kueri_pencarian": [
-      "Tingkat Partisipasi Angkatan Kerja TPAK dengan pertumbuhan ekonomi",
-      "persentase kemiskinan terhadap pertumbuhan ekonomi",
-      "hubungannya data TPAK dan persentase kemiskinan"
+      "Tingkat Partisipasi Angkatan Kerja TPAK dengan Laju Pertumbuhan Ekonomi PDRB",
+      "korelasi persentase kemiskinan terhadap pertumbuhan ekonomi",
+      "hubungannya data TPAK dan persentase kemiskinan Sulawesi Barat 2025 2026"
+    ],
+    "keyword": [
+      "TPAK",
+      "kemiskinan",
+      "pertumbuhan",
+      "ekonomi",
+      "Sulawesi",
+      "Barat",
+      "2025",
+      "2026"
     ]
-    keyword: ['TPAK', 'pertumbuhan ekonomi']
+  }}
+]
+
+CONTOH BENAR (PERTANYAAN MULTI-INDIKATOR DIPECAH):
+User: "Saya butuh data kemiskinan dan infrastruktur jalan kabupaten kota."
+[
+  {{
+    "pertanyaan_asli": "data kemiskinan kabupaten kota",
+    "kueri_pencarian": [
+      "Persentase Penduduk Miskin P0 Garis Kemiskinan kabupaten kota Sulawesi Barat 2025 2026",
+      "tingkat kesejahteraan masyarakat prasejahtera Sulawesi Barat",
+      "kemiskinan P0 miskin kabupaten kota 2025 2026"
+    ],
+    "keyword": ["kemiskinan", "kabupaten", "kota", "Sulawesi", "Barat", "2025", "2026"]
+  }},
+  {{
+    "pertanyaan_asli": "data infrastruktur jalan kabupaten kota",
+    "kueri_pencarian": [
+      "kondisi panjang jalan menurut tingkat kewenangan kabupaten kota Sulawesi Barat 2025 2026",
+      "aksesibilitas aspal permukaan jalan rusak baik Sulawesi Barat",
+      "infrastruktur jalan kabupaten kota 2025 2026"
+    ],
+    "keyword": ["infrastruktur", "jalan", "kabupaten", "kota", "Sulawesi", "Barat", "2025", "2026"]
   }}
 ]
 
@@ -188,81 +231,142 @@ async def rag_search(state):
         query = state["question"][index].rag_ques
         keywords = state["question"][index].keyword
 
-        ddgs_,docs_pdf, docs_table = await asyncio.gather(
+        ddgs_,docs_pdf, docs_table, docs_rilis_publikasi = await asyncio.gather(
             get_ddgs_arr(query),
-            get_rag_data_arr(query, keywords, 5),
-            get_rag_data_table_arr(query, keywords, 5)
+            get_rag_data_arr(query, keywords, 3),
+            get_rag_data_table_arr(query, keywords, 3),
+            get_rag_rilis_publikasi(query, keywords, 3)
         )
 
         state["question"][index].ddgs = ddgs_
         state["question"][index].rag_publikasi_brs = docs_pdf
         state["question"][index].rag_data = docs_table
+        state["question"][index].rag_rilis_publikasi = docs_rilis_publikasi
 
     return state
 
 async def rag_rerank(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
+
+        chunks_arr = []
         chunks = ""
 
         for item in state["question"][index].rag_publikasi_brs :
             chunks += item.print() +'\n\n'
+            if len(chunks) > 6000 :
+                chunks_arr.append(chunks)
+                chunks = ""
         for item in state["question"][index].rag_data :
             chunks += item.print() +'\n\n'
+            if len(chunks) > 6000 :
+                chunks_arr.append(chunks)
+                chunks = ""
+        for item in state["question"][index].rag_rilis_publikasi :
+            chunks += item.print() +'\n\n'
+            if len(chunks) > 6000 :
+                chunks_arr.append(chunks)
+                chunks = ""
         for item in state["question"][index].ddgs :
             chunks += item.print() +'\n\n'
+            if len(chunks) > 6000 :
+                chunks_arr.append(chunks)
+                chunks = ""
 
-        prompt =f""""
-Kamu adalah penilai relevansi dokumen untuk sistem RAG.
+        id_keep_rag = []
+        for chunks in chunks_arr : 
+            logger.info(chunks)
+            prompt =f""""
+    Kamu adalah sistem Penilai Relevansi Dokumen dan Perangkum (Reranker & Summarizer) untuk pipeline RAG.
 
-Tugas:
-Pilih HANYA potongan pengetahuan (knowledge chunks) yang benar-benar membantu menjawab pertanyaan.
+    Tugas:
+    1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
+    2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
+    2. Buat ringkasan (summary) singkat untuk MASING-MASING chunk yang terpilih, yang menjelaskan secara spesifik poin apa dari chunk tersebut yang menjawab pertanyaan.
 
-Aturan ketat:
-- Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
-- Hapus chunk yang hanya sedikit berkaitan.
-- Hapus chunk yang tidak membantu menjawab pertanyaan.
-- Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
-- Jika tidak ada yang relevan, kembalikan list kosong.
-- JANGAN menjawab pertanyaan.
-- Output HARUS JSON saja, tanpa penjelasan.
-- OUTPUT CUKUP Array dari id pengetahuan
-- Urutkan dari yang paling relevan
+    Aturan Evaluasi, Filtering, & Scoring:
+    - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
+    - Hapus chunk yang hanya sedikit berkaitan.
+    - Hapus chunk yang tidak membantu menjawab pertanyaan.
+    - Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
+    - Jika tidak ada yang relevan, kembalikan list kosong.
+    - JANGAN menjawab pertanyaan.
+    - Output HARUS JSON saja, tanpa penjelasan.
+    - OUTPUT CUKUP Array dari id pengetahuan
+    - Urutkan dari yang paling relevan
+    - Jangan memilih chunck yang formatnya daftar isi, daftar gambar, daftar tabel, dan daftar pustaka
+    - Berikan skor relevansi dari skala 1 hingga 10 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
+    
+    Aturan Ringkasan per Chunk:
+    - Ringkasan HARUS ditarik murni dari fakta di dalam chunk spesifik tersebut (dilarang halusinasi/menambahkan info dari luar).
+    - Buat seringkas mungkin namun tepat sasaran menjawab pertanyaan.
 
-Format JSON yang diharapkan:
-[string_id]
+    Aturan Output (Sangat Ketat):
+    - Output HARUS berupa JSON array murni.
+    - JANGAN berikan teks pengantar, penutup, atau penjelasan apa pun di luar JSON.
+    - JANGAN gunakan blok kode markdown (seperti ```json ... ```). Langsung keluarkan format JSON-nya saja.
 
-Pertanyaan:
-{ques}
+    Format JSON yang diharapkan:
+    [
+        {{
+            "id": "string_id_1",
+            "score": 9,
+            "summary": "Ringkasan poin penting dari chunk ini yang menjawab pertanyaan."
+        }},
+        {{
+            "id": "string_id_2",
+            "score": 47,
+            "summary": "Ringkasan poin penting dari chunk ini yang menjawab pertanyaan."
+        }}
+    ]
 
-Daftar knowledge chunks:
-{chunks}"""
-        
-        id_keep_rag =[]
-        attmpt = 1
-        while True:
-            if attmpt == 4 :
-                raise Exception("Terjadi kesalahan")
-            try :
-                id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
-                    "response_mime_type": "application/json",
-                    "response_json_schema":  {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                })
+    Pertanyaan:
+    {ques}
 
-                id_keep_rag = json.loads(id_keep_rag_txt.replace("```",""))
-                break
-            except Exception as e:
-                logger.info(e)
-                attmpt += 1
+    Daftar knowledge chunks:
+    {chunks}"""
+            
+            id_keep_rag =[]
+            attmpt = 1
+            while True:
+                if attmpt == 4 :
+                    raise Exception("Terjadi kesalahan")
+                try :
+                    id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
+                        "response_mime_type": "application/json",
+                        "response_json_schema":  {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                    },
+                                    "score": {
+                                        "type": "number",
+                                    },
+                                    "summary": {
+                                        "type": "string",
+                                    },
+                                },
+                            }
+                        },
+                    })
+                    logger.info(id_keep_rag_txt)
 
+                    id_keep_rag_ = json.loads(id_keep_rag_txt.replace("```",""))
+                    logger.info(id_keep_rag_)
+                    id_keep_rag += id_keep_rag_
+                    break
+                except Exception as e:
+                    logger.info(e)
+                    attmpt += 1
 
+        id_keep_rag_dict = {}
+        for item in id_keep_rag :
+            id_keep_rag_dict[item['id']] = item['summary']
         for item in state["question"][index].rag_publikasi_brs :
-            if item.id in id_keep_rag :
+            if item.id in id_keep_rag_dict :
                 state["question"][index].rag_publikasi_brs_output.append(
                     RagPublikasiBRS( 
                         id = item.id,
@@ -274,11 +378,12 @@ Daftar knowledge chunks:
                         rl_date = item.rl_date,
                         file_path= item.file_path,
                         score= item.score,
+                        summary= id_keep_rag_dict[item.id]
                     )
                 )
         
         for item in state["question"][index].rag_data :
-            if item.id in id_keep_rag :
+            if item.id in id_keep_rag_dict :
                 state["question"][index].rag_data_output.append(
                     RagData( 
                         id = item.id,
@@ -286,10 +391,23 @@ Daftar knowledge chunks:
                         url= item.url,
                         content = item.content,
                         score= item.score,
+                        summary= id_keep_rag_dict[item.id]
+                    )
+                )
+        for item in state["question"][index].rag_rilis_publikasi :
+            if item.id in id_keep_rag_dict :
+                state["question"][index].rag_rilis_publikasi_output.append(
+                    RagRilisPublikasi( 
+                        id = item.id,
+                        tipe = item.tipe, 
+                        bps_id  = item.bps_id, 
+                        rl_date = item.rl_date, 
+                        content = item.content, 
+                        score= item.score,
                     )
                 )
         for item in state["question"][index].ddgs :
-            if item.id in id_keep_rag :
+            if item.id in id_keep_rag_dict :
                 state["question"][index].ddgs_output.append(
                     DDGS( 
                         id = item.id,
@@ -298,8 +416,13 @@ Daftar knowledge chunks:
                         link = item.link,
                     )
                 )
-       
-        state["question"][index].urutan_rag  = id_keep_rag
+
+        id_keep_rag.sort(key=lambda item: item["score"])
+        id_keep_rag_iddd = []
+        for item in id_keep_rag :
+            id_keep_rag_iddd.append(item['id'])
+
+        state["question"][index].urutan_rag  = id_keep_rag_iddd
     return state
 
 async def rag_answer(state):
@@ -312,6 +435,8 @@ async def rag_answer(state):
             chunks_dict[item.id] = item
         for item in state["question"][index].rag_data_output :
             chunks_dict[item.id] = item
+        for item in state["question"][index].rag_rilis_publikasi_output :
+            chunks_dict[item.id] = item
         for item in state["question"][index].ddgs_output :
             chunks_dict[item.id] = item
 
@@ -323,7 +448,8 @@ async def rag_answer(state):
         if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
             state["question"][index].answer.append(AnswerModel(type="text", text="Maaf, kami belum menemukan data yang sesuai."))
             continue
-
+        
+        logger.info(chunks)
         prompt = LLM_PROMPT.format(
             context=chunks,
             question=ques

@@ -13,7 +13,7 @@ load_dotenv(find_dotenv())
 
 def get_vectorstore_pdf():
     CHROMA_HOST = "localhost"
-    CHROMA_PORT = int(os.getenv("CHROMA_PORT_ISI_PDF", 8000))
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT_ISI_PDF", 8090))
 
     chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
 
@@ -25,7 +25,18 @@ def get_vectorstore_pdf():
 
 def get_vectorstore_table():
     CHROMA_HOST = "localhost"
-    CHROMA_PORT = int(os.getenv("CHROMA_PORT_TABLE", 8000))
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT_TABLE", 8091))
+
+    chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+
+    return Chroma(
+        client=chroma_client,
+        embedding_function=get_embedding_function() 
+    )
+
+def get_vectorstore_rilis_publikasi():
+    CHROMA_HOST = "localhost"
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT_RILIS_PUBLIKASI", 8092))
 
     chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
 
@@ -37,6 +48,7 @@ def get_vectorstore_table():
 
 vectorstore_isi_pdf = get_vectorstore_pdf()
 vectorstore_table = get_vectorstore_table()
+vectorstore_rilis_publikasi = get_vectorstore_rilis_publikasi()
 
 logger.add(
     os.path.join(LOG_DIR, "api_{time:YYYY-MM-DD}.log"), # Nama file akan jadi seperti log/api_2026-05-26.log

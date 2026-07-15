@@ -10,6 +10,7 @@ from db.models import get_user_by_phone
 from b_graph.set_layanan import set_layanan
 from b_graph.registrasi import registrasi
 from b_graph.start_layanan import start_layanan
+import time
 
 load_dotenv()
 graph = build_graph()
@@ -62,14 +63,44 @@ async def process_per_minute():
         asyncio.create_task(iddle_task_ai(session_in_works_id))
         asyncio.create_task(iddle_task_konsultasi())
 
+
+db_buffer = {}
+async def process_per_1_second():    
+    while True:
+        await asyncio.sleep(1) # per menit
+        user = await get_user_by_phone(phone)
+
+        session, stop, send_start_layanan = await set_layanan(user, data)
+        if stop :
+            return {"status": True}
+        
+        user, stop_, send_start_layanan_ = await registrasi(user, session, data)
+        if stop_ :
+            return {"status": True}
+
+        if send_start_layanan or ( stop_ and send_start_layanan_ ) :
+            await start_layanan(user, session)
+            return {"status": True}
+
+        await ChatMessage.aio_create(
+            session = session,
+            role = "user",
+            content = data.message,
+        )
+
+        return {"status": True}
+
+
 # 3. Lifespan Manager (Mengatur startup & shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await close_24_hour()
     
+    worker_chat = asyncio.create_task(process_per_1_second())
     worker_task = asyncio.create_task(debounce_per_user_worker())
     worker_iddle = asyncio.create_task(process_per_minute())
     yield
+    worker_chat.cancel()
     worker_task.cancel()
     worker_iddle.cancel()
 
@@ -98,25 +129,16 @@ async def wablas(data: WablasIncomingMessage):
 
     id_pesan.append(data.id)
     phone = data.phone
-    user = await get_user_by_phone(phone)
-
-    session, stop, send_start_layanan = await set_layanan(user, data)
-    if stop :
-        return {"status": True}
     
-    user, stop_, send_start_layanan_ = await registrasi(user, session, data)
-    if stop_ :
-        return {"status": True}
+    if phone not in db_buffer:
+        db_buffer[phone] = {
+            "no_hp": phone,
+            "chat": [], 
+            "lastupdate": time.time(),
+        }
 
-    if send_start_layanan or ( stop_ and send_start_layanan_ ) :
-        await start_layanan(user, session)
-        return {"status": True}
-
-    await ChatMessage.aio_create(
-        session = session,
-        role = "user",
-        content = data.message,
-    )
+    db_buffer[phone]['chat'].append(data)
+    db_buffer[phone]['lastupdate'] = time.time()
 
     return {"status": True}
 

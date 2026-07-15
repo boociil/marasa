@@ -1,7 +1,7 @@
-from _global import vectorstore_isi_pdf, vectorstore_table
+from _global import vectorstore_isi_pdf, vectorstore_table, vectorstore_rilis_publikasi
 import asyncio
 from langchain_community.tools import DuckDuckGoSearchResults
-from db.model_rag import DDGS, RagData, RagPublikasiBRS
+from db.model_rag import DDGS, RagData, RagPublikasiBRS, RagRilisPublikasi
 import uuid
 import os
 from _global import logger, BASE_DIR
@@ -24,6 +24,7 @@ search_filter = {
         {"$not_contains": "daftar pustaka"},
         {"$not_contains": "Daftar Pustaka"},
         {"$not_contains": "DAFTAR PUSTAKA"},
+        {"$not_contains": "........"},
         {"$not_contains": """Halaman
 Page"""}
     ]
@@ -135,6 +136,35 @@ async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
                     id = str(uuid.uuid4()),
                     judul = doc.metadata['judul'], 
                     url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
+                    content = doc.page_content, 
+                    score= _score
+                )
+            )
+        
+    return return_value
+
+async def get_rag_rilis_publikasi(query_text_arr, keywords, k_=10):
+    tasks = [
+        vectorstore_rilis_publikasi.asimilarity_search_with_score(item_query, k=k_, where_document=search_filter)
+        for item_query in query_text_arr
+    ]
+    
+    results_per_query = await asyncio.gather(*tasks)
+    
+    results_arr = []
+    for results in results_per_query:
+        results_arr.extend(results)
+
+    return_value = []
+    for doc, _score in results_arr:
+        text = doc.page_content
+        if any(keyword.lower() in text.lower() for keyword in keywords):
+            return_value.append(
+                RagRilisPublikasi( 
+                    id = str(uuid.uuid4()),
+                    tipe = doc.metadata['tipe'], 
+                    bps_id  = str(doc.metadata['id']), 
+                    rl_date = doc.metadata['rl_date'], 
                     content = doc.page_content, 
                     score= _score
                 )
