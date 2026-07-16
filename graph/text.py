@@ -57,6 +57,9 @@ Jawaban harus dibuat secara ringkas dan berbasis fakta.
 
 Struktur jika menanyakan data atau analisis kalau info langsung jawab saja:
 
+*Pertanyaan:* [question]
+
+Pertanyaan
 *📊 DATA STATISTIK TERKINI*
 ------------------------------------------
 *Indikator:* [Nama Indikator]

@@ -25,6 +25,7 @@ search_filter = {
         {"$not_contains": "Daftar Pustaka"},
         {"$not_contains": "DAFTAR PUSTAKA"},
         {"$not_contains": "........"},
+        {"$not_contains": "…………"},
         {"$not_contains": """Halaman
 Page"""}
     ]

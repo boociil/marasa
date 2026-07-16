@@ -8,6 +8,9 @@ import json
 import unicodedata
 from langchain_community.tools import DuckDuckGoSearchResults
 from _global import logger
+from aiolimiter import AsyncLimiter
+
+rate_limit = AsyncLimiter(4, 60)
 
 import asyncio
 
@@ -21,10 +24,38 @@ async def pecah_question_and_transform_untuk_rag(state) :
     prompt = f"""Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
 
 TUJUAN:
-Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, dan hasilkan variasi kueri pencarian yang dioptimalkan untuk memaksimalkan relevansi dokumen (publikasi, tabel statis, atau metadata) yang ditarik oleh sistem. Hasilkan juga array kata kunci (keyword) spesifik.
+Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, lalu LANGSUNG TERJEMAHKAN istilah di dalam pertanyaan tersebut menggunakan Terminologi Resmi BPS (ke dalam field `pertanyaan_asli`). Kemudian hasilkan variasi kueri pencarian yang dioptimalkan dan array kata kunci (keyword) spesifik untuk memaksimalkan relevansi dokumen yang ditarik oleh sistem.
+
+PANDUAN WAJIB TERMINOLOGI STATISTIK (BPS):
+Setiap istilah awam atau singkatan di bawah ini WAJIB diubah ke istilah resmi BPS, baik di dalam ekstraksi pertanyaan (`pertanyaan_asli`), `kueri_pencarian`, maupun `keyword`:
+A. Ekonomi Makro & Kesejahteraan:
+    - Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi
+    - Daya beli / pengeluaran warga ➔ Pengeluaran Konsumsi Rumah Tangga, Pengeluaran per Kapita
+    - Inflasi / harga naik ➔ Indeks Harga Konsumen
+    - Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin, Garis Kemiskinan
+    - Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan
+B. Ketenagakerjaan:
+    - Pengangguran / susah cari kerja / TPT ➔ Tingkat Pengangguran Terbuka
+    - Ketersediaan tenaga kerja / TPAK ➔ Angkatan Kerja, Tingkat Partisipasi Angkatan Kerja
+    - Orang kerja ➔ Penduduk Bekerja
+    - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔ Lulusan Diploma IV, S1, S2, S3
+C. Sosial, Pendidikan, Kesehatan:
+    - Kualitas hidup / kesejahteraan / IPM ➔ Indeks Pembangunan Manusia
+    - Umur panjang / kesehatan / AHH ➔ Angka Harapan Hidup
+    - Pendidikan / putus sekolah / RLS / HLS ➔ Rata-rata Lama Sekolah, Harapan Lama Sekolah
+D. Pertanian & Kesejahteraan Petani:
+    - Kesejahteraan petani / NTP / NTUP ➔ Nilai Tukar Petani, Nilai Tukar Usaha Pertanian
+    - Hasil panen / produksi tani ➔ Luas Panen, Produktivitas, Produksi
+E. Bahasa Sektor / Lapangan Usaha Eksekutif:
+    - Industri / pabrik / manufaktur ➔ PDRB Lapangan Usaha Industri Pengolahan
+    - Pariwisata / hotel / restoran / pengunjung ➔ PDRB Lapangan Usaha Penyediaan Akomodasi dan Makan Minum, Tingkat Penghunian Kamar, Jumlah Wisatawan
+    - Tambang / galian ➔ PDRB Lapangan Usaha Pertambangan dan Penggalian
+    - Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran
+    - Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi
+    - Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan
 
 ATURAN EKSTRAKSI PERTANYAAN:
-1. Pertahankan konteks utama dan bahasa asli dari pertanyaan.
+1. Pertahankan bahasa asli dari pertanyaan.
 2. Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
 3. Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
 4. PECAH PERTANYAAN MULTI-INDIKATOR (SANGAT PENTING): Jika teks meminta beberapa indikator atau topik yang tidak saling berhubungan (misalnya: "data x, y, dan z"), Anda WAJIB memecahnya menjadi beberapa objek JSON (pertanyaan) yang terpisah untuk masing-masing indikator.
@@ -37,6 +68,7 @@ ATURAN EKSTRAKSI KATA KUNCI (KEYWORD):
 2. Setiap item dalam array keyword HARUS tepat 1 (satu) kata tunggal. Jika ada frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
 3. Pastikan kata kunci periode waktu/tahun dimasukkan ke dalam array jika ada atau jika ditambahkan secara otomatis.
 4. ABAIKAN kata kuantitas, agregasi, kata percakapan, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa", "tolong", "carikan").
+5. Keyword tidak boleh singkatan
 
 ATURAN OPTIMASI KUERI PENCARIAN RAG:
 1. Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan. Kueri tidak boleh bergantung pada referensi kata ganti ("itu", "dia").
@@ -54,6 +86,7 @@ ATURAN OPTIMASI KUERI PENCARIAN RAG:
       - Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka)
       - Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK (Tingkat Partisipasi Angkatan Kerja)
       - Orang kerja ➔ Penduduk Bekerja
+      - Lulusan Perguruan Tinggi => Diploma IV, S1, S2, S3
    C. Sosial, Pendidikan, Kesehatan:
       - Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia)
       - Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup)
@@ -214,6 +247,7 @@ Teks Pengguna:
             break
         except Exception as e:
             logger.info(e)
+            await asyncio.sleep(10)
             attmpt += 1
     logger.info(extract_rag_json)
     ques_arr = []
@@ -253,15 +287,9 @@ async def rag_rerank(state):
         chunks = ""
 
         for item in state["question"][index].rag_publikasi_brs :
-            chunks += item.print() +'\n\n'
-            if len(chunks) > 6000 :
-                chunks_arr.append(chunks)
-                chunks = ""
+            chunks_arr.append(item.print())
         for item in state["question"][index].rag_data :
-            chunks += item.print() +'\n\n'
-            if len(chunks) > 6000 :
-                chunks_arr.append(chunks)
-                chunks = ""
+            chunks_arr.append(item.print())
         for item in state["question"][index].rag_rilis_publikasi :
             chunks += item.print() +'\n\n'
             if len(chunks) > 6000 :
@@ -276,13 +304,11 @@ async def rag_rerank(state):
         id_keep_rag = []
         for chunks in chunks_arr : 
             logger.info(chunks)
-            prompt =f""""
-    Kamu adalah sistem Penilai Relevansi Dokumen dan Perangkum (Reranker & Summarizer) untuk pipeline RAG.
+            prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen  untuk pipeline RAG.
 
     Tugas:
     1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
     2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
-    2. Buat ringkasan (summary) singkat untuk MASING-MASING chunk yang terpilih, yang menjelaskan secara spesifik poin apa dari chunk tersebut yang menjawab pertanyaan.
 
     Aturan Evaluasi, Filtering, & Scoring:
     - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
@@ -297,9 +323,6 @@ async def rag_rerank(state):
     - Jangan memilih chunck yang formatnya daftar isi, daftar gambar, daftar tabel, dan daftar pustaka
     - Berikan skor relevansi dari skala 1 hingga 10 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
     
-    Aturan Ringkasan per Chunk:
-    - Ringkasan HARUS ditarik murni dari fakta di dalam chunk spesifik tersebut (dilarang halusinasi/menambahkan info dari luar).
-    - Buat seringkas mungkin namun tepat sasaran menjawab pertanyaan.
 
     Aturan Output (Sangat Ketat):
     - Output HARUS berupa JSON array murni.
@@ -311,12 +334,10 @@ async def rag_rerank(state):
         {{
             "id": "string_id_1",
             "score": 9,
-            "summary": "Ringkasan poin penting dari chunk ini yang menjawab pertanyaan."
         }},
         {{
             "id": "string_id_2",
             "score": 47,
-            "summary": "Ringkasan poin penting dari chunk ini yang menjawab pertanyaan."
         }}
     ]
 
@@ -326,45 +347,44 @@ async def rag_rerank(state):
     Daftar knowledge chunks:
     {chunks}"""
             
-            id_keep_rag =[]
             attmpt = 1
             while True:
                 if attmpt == 4 :
                     raise Exception("Terjadi kesalahan")
                 try :
-                    id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
-                        "response_mime_type": "application/json",
-                        "response_json_schema":  {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "id": {
-                                        "type": "string",
+                    async with rate_limit:
+                        id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
+                            "response_mime_type": "application/json",
+                            "response_json_schema":  {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                        },
+                                        "score": {
+                                            "type": "number",
+                                        },
                                     },
-                                    "score": {
-                                        "type": "number",
-                                    },
-                                    "summary": {
-                                        "type": "string",
-                                    },
-                                },
-                            }
-                        },
-                    })
-                    logger.info(id_keep_rag_txt)
+                                }
+                            },
+                        })
 
-                    id_keep_rag_ = json.loads(id_keep_rag_txt.replace("```",""))
-                    logger.info(id_keep_rag_)
-                    id_keep_rag += id_keep_rag_
-                    break
+                        id_keep_rag_ = json.loads(id_keep_rag_txt.replace("```",""))
+                        logger.info(id_keep_rag_)
+                        id_keep_rag += id_keep_rag_
+                        break
                 except Exception as e:
                     logger.info(e)
+                    await asyncio.sleep(10)
                     attmpt += 1
 
         id_keep_rag_dict = {}
         for item in id_keep_rag :
-            id_keep_rag_dict[item['id']] = item['summary']
+            id_keep_rag_dict[item['id']] = item['score']
+
+        logger.info(id_keep_rag)
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag_dict :
                 state["question"][index].rag_publikasi_brs_output.append(
@@ -378,7 +398,6 @@ async def rag_rerank(state):
                         rl_date = item.rl_date,
                         file_path= item.file_path,
                         score= item.score,
-                        summary= id_keep_rag_dict[item.id]
                     )
                 )
         
@@ -391,7 +410,6 @@ async def rag_rerank(state):
                         url= item.url,
                         content = item.content,
                         score= item.score,
-                        summary= id_keep_rag_dict[item.id]
                     )
                 )
         for item in state["question"][index].rag_rilis_publikasi :
@@ -428,7 +446,7 @@ async def rag_rerank(state):
 async def rag_answer(state):
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
-        
+
         chunks = ""
         chunks_dict = {}
         for item in state["question"][index].rag_publikasi_brs_output :
@@ -440,16 +458,15 @@ async def rag_answer(state):
         for item in state["question"][index].ddgs_output :
             chunks_dict[item.id] = item
 
-
         for id_ in  state["question"][index].urutan_rag : 
             if id_ in chunks_dict :
                 chunks += chunks_dict[id_].print()+'\n\n'
         
+        logger.info(chunks)
         if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
             state["question"][index].answer.append(AnswerModel(type="text", text="Maaf, kami belum menemukan data yang sesuai."))
             continue
         
-        logger.info(chunks)
         prompt = LLM_PROMPT.format(
             context=chunks,
             question=ques
@@ -481,16 +498,14 @@ async def rag_answer(state):
                     },
                 })
 
-                logger.info(hasil_txt)
-
                 hasil = json.loads(hasil_txt.replace("```",""))
                 break
             except Exception as e:
                 logger.info(e)
+                await asyncio.sleep(10)
                 attmpt += 1
 
         for item_sitasi in hasil['sitasi'] :
-            logger.info(chunks_dict[item_sitasi].print())
             if isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
                 state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
         
