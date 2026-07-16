@@ -13,7 +13,12 @@ class RagPublikasiBRS(BaseModel):
     rl_date: str
     file_path: str
     score: float
+    jawaban: str = ''
     def print(self):
+        if self.jawaban != '':
+            return self.print_jawaban()
+
+
         rl_date_split = self.rl_date.split("-")
         if self.type == 'pub' :
             return f"""ID Pengetahuan :  {self.id}
@@ -33,6 +38,26 @@ Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
 """
+    def print_jawaban(self):
+        rl_date_split = self.rl_date.split("-")
+        if self.type == 'pub' :
+            return f"""ID Pengetahuan :  {self.id}
+jenis : internal
+Judul : {self.title}
+Content : {self.jawaban}
+Release : {self.rl_date}
+Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
+Score : {self.score}
+"""
+        elif  self.type == 'brs' : 
+            return f"""ID Pengetahuan :  {self.id}
+jenis : internal
+Judul : {self.title}
+Content : {self.jawaban}
+Release : {self.rl_date}
+Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
+Score : {self.score}
+"""
 
 class RagData(BaseModel):
     id: str
@@ -40,7 +65,11 @@ class RagData(BaseModel):
     url: str
     content: str
     score: float
+    jawaban: str = ''
     def print(self):
+        if self.jawaban != '':
+            return self.print_jawaban()
+
         return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.judul}
@@ -48,6 +77,15 @@ content : {self.content}
 Url : {self.url}
 Score : {self.score}
 """
+    def print_jawaban(self):
+        return f"""ID Pengetahuan :  {self.id}
+jenis : internal
+Judul : {self.judul}
+content : {self.jawaban}
+Url : {self.url}
+Score : {self.score}
+"""
+
     
     
 class RagRilisPublikasi(BaseModel):

@@ -289,14 +289,9 @@ async def rag_rerank(state):
         chunks = ""
 
         for item in state["question"][index].rag_data :
-            chunks += item.print() +'\n\n'
-        chunks_arr.append(chunks)
-        chunks = ""
-
+            chunks_arr.append(item.print())
         for item in state["question"][index].rag_publikasi_brs :
-            chunks += item.print() +'\n\n'
-        chunks_arr.append(chunks)
-        chunks = ""
+            chunks_arr.append(item.print())
 
         for item in state["question"][index].rag_rilis_publikasi :
             chunks += item.print() +'\n\n'
@@ -311,12 +306,13 @@ async def rag_rerank(state):
 
         id_keep_rag = []
         for chunks in chunks_arr : 
-            logger.info(chunks)
-            prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen  untuk pipeline RAG.
+            # logger.info(chunks)
+            prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen dan Ekstraktor Jawaban untuk pipeline RAG..
 
     Tugas:
     1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
     2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
+    3. Ekstrak atau susun jawaban untuk pertanyaan pengguna yang HANYA didasarkan pada masing-masing chunk yang terpilih tersebut.
 
     Aturan Evaluasi, Filtering, & Scoring:
     - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
@@ -342,10 +338,12 @@ async def rag_rerank(state):
         {{
             "id": "string_id_1",
             "score": 9,
+            "jawaban": "Tuliskan jawaban spesifik untuk pertanyaan pengguna yang ditarik HANYA dari chunk ini."
         }},
         {{
             "id": "string_id_2",
             "score": 47,
+            "jawaban": "Tuliskan jawaban spesifik untuk pertanyaan pengguna yang ditarik HANYA dari chunk ini."
         }}
     ]
 
@@ -374,6 +372,9 @@ async def rag_rerank(state):
                                         "score": {
                                             "type": "number",
                                         },
+                                        "jawaban": {
+                                            "type": "string",
+                                        },
                                     },
                                 }
                             },
@@ -393,36 +394,40 @@ async def rag_rerank(state):
 
         id_keep_rag_dict = {}
         for item in id_keep_rag :
-            id_keep_rag_dict[item['id']] = item['score']
+            id_keep_rag_dict[item['id']] = {'jawaban' : item['jawaban'], 'score': item['score']}
 
         logger.info(id_keep_rag)
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag_dict :
-                state["question"][index].rag_publikasi_brs_output.append(
-                    RagPublikasiBRS( 
-                        id = item.id,
-                        bps_id = item.bps_id,
-                        type = item.type,
-                        title = item.title, 
-                        halaman= item.halaman,
-                        content = item.content,
-                        rl_date = item.rl_date,
-                        file_path= item.file_path,
-                        score= item.score,
+                if id_keep_rag_dict[item.id]['score'] > 1 :
+                    state["question"][index].rag_publikasi_brs_output.append(
+                        RagPublikasiBRS( 
+                            id = item.id,
+                            bps_id = item.bps_id,
+                            type = item.type,
+                            title = item.title, 
+                            halaman= item.halaman,
+                            content = item.content,
+                            rl_date = item.rl_date,
+                            file_path= item.file_path,
+                            score= item.score,
+                            jawaban= id_keep_rag_dict[item.id]['jawaban']
+                        )
                     )
-                )
         
         for item in state["question"][index].rag_data :
             if item.id in id_keep_rag_dict :
-                state["question"][index].rag_data_output.append(
-                    RagData( 
-                        id = item.id,
-                        judul = item.judul,
-                        url= item.url,
-                        content = item.content,
-                        score= item.score,
+                if id_keep_rag_dict[item.id]['score'] > 1 :
+                    state["question"][index].rag_data_output.append(
+                        RagData( 
+                            id = item.id,
+                            judul = item.judul,
+                            url= item.url,
+                            content = item.content,
+                            score= item.score,
+                            jawaban= id_keep_rag_dict[item.id]['jawaban']
+                        )
                     )
-                )
         for item in state["question"][index].rag_rilis_publikasi :
             if item.id in id_keep_rag_dict :
                 state["question"][index].rag_rilis_publikasi_output.append(
@@ -446,7 +451,7 @@ async def rag_rerank(state):
                     )
                 )
 
-        id_keep_rag.sort(key=lambda item: item["score"])
+        id_keep_rag.sort(key=lambda item: item["score"], reverse=True)
         id_keep_rag_iddd = []
         for item in id_keep_rag :
             id_keep_rag_iddd.append(item['id'])
@@ -469,7 +474,7 @@ async def rag_answer(state):
         for item in state["question"][index].ddgs_output :
             chunks_dict[item.id] = item
 
-        for id_ in  state["question"][index].urutan_rag[:5] : 
+        for id_ in  state["question"][index].urutan_rag : 
             if id_ in chunks_dict :
                 chunks += chunks_dict[id_].print()+'\n\n'
         
