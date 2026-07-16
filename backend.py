@@ -5,6 +5,8 @@ from populate.populate.populate_pdf import populate_pdf
 from populate.populate.populate_data import populate_table
 from populate.populate.populate_image import populate_image
 from graph.main import main_chat_cmd, build_graph
+from populate.chromaDb_Qdrant import load_data
+from _global import vectorstore_isi_pdf, vectorstore_table, vectorstore_rilis_publikasi
 
 from db.init_db import init_db
 import asyncio
@@ -22,6 +24,7 @@ async def main():
     parser.add_argument("--query", type=str, help="Query data.")
     parser.add_argument("--create_db", action="store_true", help="Create DB.")
     parser.add_argument("--start_chat", action="store_true", help="Start Chating.")
+    parser.add_argument("--porting", action="store_true", help="Start Chating.")
 
 
     args = parser.parse_args()
@@ -43,6 +46,9 @@ async def main():
         return
     if args.populate_image:
         populate_image()
+        return
+    if args.porting:
+        await load_data(vectorstore_rilis_publikasi, 'rilis_publikasi')
         return
     
     if args.create_db:

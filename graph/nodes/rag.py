@@ -31,7 +31,7 @@ Setiap istilah awam atau singkatan di bawah ini WAJIB diubah ke istilah resmi BP
 A. Ekonomi Makro & Kesejahteraan:
     - Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi
     - Daya beli / pengeluaran warga ➔ Pengeluaran Konsumsi Rumah Tangga, Pengeluaran per Kapita
-    - Inflasi / harga naik ➔ Indeks Harga Konsumen
+    - Inflasi / harga naik ➔ Inflasi, Indeks Harga Konsumen
     - Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin, Garis Kemiskinan
     - Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan
 B. Ketenagakerjaan:

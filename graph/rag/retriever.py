@@ -33,7 +33,7 @@ Page"""}
 
 async def get_rag_data_arr(query_text_arr, keywords, k_=10):    
     tasks = [
-        vectorstore_isi_pdf.asimilarity_search_with_score(item_query, k=k_, where_document=search_filter)
+        vectorstore_isi_pdf.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(2*k_),lambda_mult=0.5, where_document=search_filter)
         for item_query in query_text_arr
     ]
     
@@ -48,7 +48,7 @@ async def get_rag_data_arr(query_text_arr, keywords, k_=10):
     sorce_page_unique_halama = {}
 
     tasks2 = []
-    for doc, _score in results_arr:
+    for doc in results_arr:
         if int(doc.id.split(':')[-1]) != 0 :
             tasks2.append(get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']))
     if len(tasks2) > 0 :
@@ -56,7 +56,7 @@ async def get_rag_data_arr(query_text_arr, keywords, k_=10):
         for item_ in results_per_query_halaman :
             sorce_page_unique_halama[item_[0]] = item_[1]     
                                                                    
-    for doc, _score in results_arr:
+    for doc in results_arr:
         bps_id = ""
         type = ""
 
@@ -88,7 +88,7 @@ async def get_rag_data_arr(query_text_arr, keywords, k_=10):
                         content = doc.page_content if source_page not in sorce_page_unique_halama else sorce_page_unique_halama[source_page], 
                         rl_date = doc.metadata['rl_date'], 
                         file_path = path_image,
-                        score= _score
+                        score= 1
                     )
                 )
                 sorce_page_unique.append(source_page)
@@ -118,7 +118,7 @@ async def get_content_rag_data_by_halaman(source, page):
 
 async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
     tasks = [
-        vectorstore_table.asimilarity_search_with_score(item_query, k=k_, where_document=search_filter)
+        vectorstore_table.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(2*k_),lambda_mult=0.5, where_document=search_filter)
         for item_query in query_text_arr
     ]
     
@@ -129,7 +129,7 @@ async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
         results_arr.extend(results)
 
     return_value = []
-    for doc, _score in results_arr:
+    for doc in results_arr:
         text = doc.page_content
         if any(keyword.lower() in text.lower() for keyword in keywords):
             return_value.append(
@@ -138,7 +138,7 @@ async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
                     judul = doc.metadata['judul'], 
                     url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
                     content = doc.page_content, 
-                    score= _score
+                    score= 1
                 )
             )
         
