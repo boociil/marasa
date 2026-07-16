@@ -53,6 +53,8 @@ E. Bahasa Sektor / Lapangan Usaha Eksekutif:
     - Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran
     - Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi
     - Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan
+E. Wilayah:
+    - 6 Kabupaten ➔ Majene, Polewali Mandar, Mamasa, Mamuju, Pasangkayu, Mamuju Tengah
 
 ATURAN EKSTRAKSI PERTANYAAN:
 1. Pertahankan bahasa asli dari pertanyaan.
@@ -286,10 +288,16 @@ async def rag_rerank(state):
         chunks_arr = []
         chunks = ""
 
-        for item in state["question"][index].rag_publikasi_brs :
-            chunks_arr.append(item.print())
         for item in state["question"][index].rag_data :
-            chunks_arr.append(item.print())
+            chunks += item.print() +'\n\n'
+        chunks_arr.append(chunks)
+        chunks = ""
+
+        for item in state["question"][index].rag_publikasi_brs :
+            chunks += item.print() +'\n\n'
+        chunks_arr.append(chunks)
+        chunks = ""
+
         for item in state["question"][index].rag_rilis_publikasi :
             chunks += item.print() +'\n\n'
             if len(chunks) > 6000 :
@@ -379,6 +387,9 @@ async def rag_rerank(state):
                     logger.info(e)
                     await asyncio.sleep(10)
                     attmpt += 1
+                for item_score in id_keep_rag :
+                    if item_score['score'] == 100 :
+                        break
 
         id_keep_rag_dict = {}
         for item in id_keep_rag :
@@ -458,7 +469,7 @@ async def rag_answer(state):
         for item in state["question"][index].ddgs_output :
             chunks_dict[item.id] = item
 
-        for id_ in  state["question"][index].urutan_rag : 
+        for id_ in  state["question"][index].urutan_rag[:5] : 
             if id_ in chunks_dict :
                 chunks += chunks_dict[id_].print()+'\n\n'
         
