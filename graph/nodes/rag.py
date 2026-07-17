@@ -10,7 +10,7 @@ from langchain_community.tools import DuckDuckGoSearchResults
 from _global import logger
 from aiolimiter import AsyncLimiter
 
-rate_limit = AsyncLimiter(4, 60)
+rate_limit = AsyncLimiter(3, 60)
 
 import asyncio
 
@@ -38,7 +38,7 @@ B. Ketenagakerjaan:
     - Pengangguran / susah cari kerja / TPT ➔ Tingkat Pengangguran Terbuka
     - Ketersediaan tenaga kerja / TPAK ➔ Angkatan Kerja, Tingkat Partisipasi Angkatan Kerja
     - Orang kerja ➔ Penduduk Bekerja
-    - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔ Lulusan Diploma IV, S1, S2, S3
+    - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔  Pendidikan Tinggi (Diploma I/II/III/Akademi dan Universitas)
 C. Sosial, Pendidikan, Kesehatan:
     - Kualitas hidup / kesejahteraan / IPM ➔ Indeks Pembangunan Manusia
     - Umur panjang / kesehatan / AHH ➔ Angka Harapan Hidup
@@ -88,7 +88,7 @@ ATURAN OPTIMASI KUERI PENCARIAN RAG:
       - Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka)
       - Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK (Tingkat Partisipasi Angkatan Kerja)
       - Orang kerja ➔ Penduduk Bekerja
-      - Lulusan Perguruan Tinggi => Diploma IV, S1, S2, S3
+      - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔  Pendidikan Tinggi (Diploma I/II/III/Akademi dan Universitas)
    C. Sosial, Pendidikan, Kesehatan:
       - Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia)
       - Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup)
@@ -269,9 +269,9 @@ async def rag_search(state):
 
         ddgs_,docs_pdf, docs_table, docs_rilis_publikasi = await asyncio.gather(
             get_ddgs_arr(query),
-            get_rag_data_arr(query, keywords, 3),
-            get_rag_data_table_arr(query, keywords, 3),
-            get_rag_rilis_publikasi(query, keywords, 3)
+            get_rag_data_arr(query, keywords, 5),
+            get_rag_data_table_arr(query, keywords, 5),
+            get_rag_rilis_publikasi(query, keywords, 5)
         )
 
         state["question"][index].ddgs = ddgs_
@@ -281,29 +281,36 @@ async def rag_search(state):
 
     return state
 
+def append_chunk(chunks_arr, chunks, text, max_chars=6000):
+    text = text + "\n\n"
+
+    if not chunks:
+        return text
+
+    if len(chunks) + len(text) <= max_chars:
+        return chunks + text
+
+    chunks_arr.append(chunks)
+    return text
+
 async def rag_rerank(state):
-    for index, item in enumerate(state['question']) :
+    logger.info(f'rag_rerank : {len(state['question'])}')
+    for index, item__ in enumerate(state['question']) :
         ques = state["question"][index].ques
 
         chunks_arr = []
         chunks = ""
 
         for item in state["question"][index].rag_data :
-            chunks_arr.append(item.print())
+            chunks = append_chunk(chunks_arr, chunks, item.print())
         for item in state["question"][index].rag_publikasi_brs :
-            chunks_arr.append(item.print())
-
+            chunks = append_chunk(chunks_arr, chunks, item.print())
         for item in state["question"][index].rag_rilis_publikasi :
-            chunks += item.print() +'\n\n'
-            if len(chunks) > 6000 :
-                chunks_arr.append(chunks)
-                chunks = ""
+            chunks = append_chunk(chunks_arr, chunks, item.print())
         for item in state["question"][index].ddgs :
-            chunks += item.print() +'\n\n'
-            if len(chunks) > 6000 :
-                chunks_arr.append(chunks)
-                chunks = ""
-
+            chunks = append_chunk(chunks_arr, chunks, item.print())
+        chunks_arr.append(chunks)
+        
         id_keep_rag = []
         for chunks in chunks_arr : 
             # logger.info(chunks)
@@ -313,6 +320,8 @@ async def rag_rerank(state):
     1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
     2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
     3. Ekstrak atau susun jawaban untuk pertanyaan pengguna yang HANYA didasarkan pada masing-masing chunk yang terpilih tersebut.
+    4. Jawaban harus lengkap dan jangan di perpendek
+    5. Perhatikan pertanyaan dan periode data yang ditanyakan saat menghasilkan jawaban
 
     Aturan Evaluasi, Filtering, & Scoring:
     - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
@@ -320,12 +329,13 @@ async def rag_rerank(state):
     - Hapus chunk yang tidak membantu menjawab pertanyaan.
     - Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
     - Jika tidak ada yang relevan, kembalikan list kosong.
+    - Perhatikan periode data saat memilih chunk
     - JANGAN menjawab pertanyaan.
     - Output HARUS JSON saja, tanpa penjelasan.
     - OUTPUT CUKUP Array dari id pengetahuan
     - Urutkan dari yang paling relevan
     - Jangan memilih chunck yang formatnya daftar isi, daftar gambar, daftar tabel, dan daftar pustaka
-    - Berikan skor relevansi dari skala 1 hingga 10 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
+    - Berikan skor relevansi dari skala 1 hingga 100 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
     
 
     Aturan Output (Sangat Ketat):
@@ -353,9 +363,10 @@ async def rag_rerank(state):
     Daftar knowledge chunks:
     {chunks}"""
             
+            found = False
             attmpt = 1
             while True:
-                if attmpt == 4 :
+                if attmpt > 4 :
                     raise Exception("Terjadi kesalahan")
                 try :
                     async with rate_limit:
@@ -386,17 +397,18 @@ async def rag_rerank(state):
                         break
                 except Exception as e:
                     logger.info(e)
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(20)
                     attmpt += 1
-                for item_score in id_keep_rag :
-                    if item_score['score'] == 100 :
-                        break
 
+            for item_score in id_keep_rag :
+                if item_score['score'] == 100 :
+                    found = True
+            if found :
+                break
         id_keep_rag_dict = {}
         for item in id_keep_rag :
             id_keep_rag_dict[item['id']] = {'jawaban' : item['jawaban'], 'score': item['score']}
 
-        logger.info(id_keep_rag)
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag_dict :
                 if id_keep_rag_dict[item.id]['score'] > 1 :
@@ -457,9 +469,12 @@ async def rag_rerank(state):
             id_keep_rag_iddd.append(item['id'])
 
         state["question"][index].urutan_rag  = id_keep_rag_iddd
+        logger.info(f'{index} : {ques}')
+        logger.info(id_keep_rag)
     return state
 
 async def rag_answer(state):
+    logger.info('rag_answer')
     for index, item in enumerate(state['question']) :
         ques = state["question"][index].ques
 
@@ -491,7 +506,7 @@ async def rag_answer(state):
         hasil = None
         attmpt = 1
         while True:
-            if attmpt == 4 :
+            if attmpt > 4 :
                 raise Exception("Terjadi kesalahan")
             try :
                 hasil_txt = await llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'),config={
@@ -520,7 +535,7 @@ async def rag_answer(state):
                 logger.info(e)
                 await asyncio.sleep(10)
                 attmpt += 1
-
+        logger.info(hasil)
         for item_sitasi in hasil['sitasi'] :
             if isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
                 state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))

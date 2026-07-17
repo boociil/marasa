@@ -12,11 +12,12 @@ async def llm_query(prompt: str, api_key_s, config) :
     client = genai.Client(api_key=api_key_s)
 
     model = "gemma-4-31b-it"
-
+    logger.info('llm_query start')
     response = await client.aio.models.generate_content(
         model=model, contents=prompt, config=config
     )
     if response and response.text:
+        logger.info('llm_query end')
         return response.text
     else:
         raise Exception("Terjadi kesalahan")
