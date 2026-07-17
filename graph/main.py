@@ -70,7 +70,7 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
             await session.aio_save()
             return
         elif result['check'] == 'ADMIN' :
-            await send_simple_text(user.notelp, 'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
+            await send_simple_text(user.notelp, f'Siap, kak {user.nama_lengkap}! Saya bantu hubungkan dengan petugas kami ya supaya bisa dibantu lebih detail. Mohon tunggu sebentar ya! ☕🤝')
             session.is_done = True;
             await session.aio_save()
             return

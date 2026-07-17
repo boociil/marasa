@@ -1,38 +1,34 @@
 from datetime import datetime
-from typing import Optional, List, Literal, Dict
-from pydantic import BaseModel, HttpUrl
+from typing import Optional, List
+from pydantic import BaseModel, Field
 
 class GroupDetail(BaseModel):
-    sender: Optional[str]= ""
-    subject: Optional[str]= ""
-    owner: Optional[str]= ""
-    desc: Optional[str]= ""
-    participants: Optional[List[str]] = ""
+    sender: Optional[str] = ""
+    subject: Optional[str] = ""
+    owner: Optional[str] = ""
+    desc: Optional[str] = ""
+    participants: Optional[List[str]] = Field(default_factory=list)
 
 class WablasIncomingMessage(BaseModel):
     id: str
-    pushName: str
-    isGroup: bool
-    group: GroupDetail
+    pushName: str = "" 
+    isGroup: bool = False
     
-    # Keterangan gambar (caption) jika ada, jika tidak ada biasanya string kosong
-    message: str 
+    group: Optional[GroupDetail] = None 
+    
+    message: str = "" 
     phone: str
     
-    # Membatasi tipe pesan agar kita tahu cara menanganinya (text, image, video, document, dll)
-    messageType: str 
+    messageType: str = "text"
     
-    # Data spesifik untuk media (Image/Video/Dokumen)
-    file: Optional[str]
-    url: Optional[str] = None # Akan tervalidasi sebagai URL jika tidak kosong
-    mimeType: Optional[str]
+
+    file: Optional[str] = None
+    url: Optional[str] = None 
+    mimeType: Optional[str] = None
     
-    deviceId: Optional[str]
-    sender: str
-    isFromMe: bool
+    deviceId: Optional[str] = None
+    sender: str = ""
+    isFromMe: bool = False
     timestamp: datetime
     
-    # Gunakan Optional[HttpUrl] atau str karena profileImage bisa kosong jika user tidak punya foto
     profileImage: Optional[str] = None
-
-

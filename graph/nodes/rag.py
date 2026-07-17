@@ -5,20 +5,22 @@ from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, RagRilisPublik
 from dotenv import load_dotenv, find_dotenv
 import os
 import json
+import re
 import unicodedata
 from langchain_community.tools import DuckDuckGoSearchResults
 from _global import logger
 from aiolimiter import AsyncLimiter
-
-rate_limit = AsyncLimiter(3, 60)
-
 import asyncio
 
+rate_limit = AsyncLimiter(3, 60)
 load_dotenv(find_dotenv()) 
+
+def clean_json_string(text: str) -> str:
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
+    return cleaned
 
 async def pecah_question_and_transform_untuk_rag(state) :
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
-
     new_chat = "\n".join(state["new_chat"])
 
     prompt = f"""Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
@@ -247,20 +249,21 @@ Teks Pengguna:
                     }
                 },
             })
-            extract_rag_json = json.loads(extract_rag.replace("```",""))
+            extract_rag_json = json.loads(clean_json_string(extract_rag))
             break
         except Exception as e:
             logger.info(e)
             await asyncio.sleep(10)
             attmpt += 1
+            
     logger.info(extract_rag_json)
     ques_arr = []
     for item in extract_rag_json:
         kueri_pencarian = []
-        for item_kuri in item['kueri_pencarian']:
+        for item_kuri in item.get('kueri_pencarian', []):
             if item_kuri.strip() != "" :
                 kueri_pencarian.append(item_kuri.strip())
-        ques_arr.append(QuestionModel(ques=item['pertanyaan_asli'], rag_ques=kueri_pencarian, keyword=item['keyword']))
+        ques_arr.append(QuestionModel(ques=item.get('pertanyaan_asli', ''), rag_ques=kueri_pencarian, keyword=item.get('keyword', [])))
     state["question"] = ques_arr
     return state
 
@@ -296,7 +299,7 @@ def append_chunk(chunks_arr, chunks, text, max_chars=6000):
     return text
 
 async def rag_rerank(state):
-    logger.info(f'rag_rerank : {len(state['question'])}')
+    logger.info(f"rag_rerank : {len(state['question'])}")
     for index, item__ in enumerate(state['question']) :
         ques = state["question"][index].ques
 
@@ -392,8 +395,8 @@ async def rag_rerank(state):
                                 }
                             },
                         })
-
-                        id_keep_rag_ = json.loads(id_keep_rag_txt.replace("```",""))
+                        # FIX 3: Robust JSON stripping
+                        id_keep_rag_ = json.loads(clean_json_string(id_keep_rag_txt))
                         logger.info(id_keep_rag_)
                         id_keep_rag += id_keep_rag_
                         break
@@ -403,13 +406,14 @@ async def rag_rerank(state):
                     attmpt += 1
 
             for item_score in id_keep_rag :
-                if item_score['score'] == 100 :
+                if item_score.get('score', 0) == 100 :
                     found = True
             if found :
                 break
+                
         id_keep_rag_dict = {}
         for item in id_keep_rag :
-            id_keep_rag_dict[item['id']] = {'jawaban' : item['jawaban'], 'score': item['score']}
+            id_keep_rag_dict[item['id']] = {'jawaban' : item.get('jawaban', ''), 'score': item.get('score', 0)}
 
         for item in state["question"][index].rag_publikasi_brs :
             if item.id in id_keep_rag_dict :
@@ -424,8 +428,8 @@ async def rag_rerank(state):
                             content = item.content,
                             rl_date = item.rl_date,
                             file_path= item.file_path,
-                            score= item.score,
-                            jawaban= id_keep_rag_dict[item.id]['jawaban']
+                            score = id_keep_rag_dict[item.id]['score'],
+                            jawaban = id_keep_rag_dict[item.id]['jawaban']
                         )
                     )
         
@@ -438,22 +442,25 @@ async def rag_rerank(state):
                             judul = item.judul,
                             url= item.url,
                             content = item.content,
-                            score= item.score,
-                            jawaban= id_keep_rag_dict[item.id]['jawaban']
+                            score = id_keep_rag_dict[item.id]['score'],
+                            jawaban = id_keep_rag_dict[item.id]['jawaban']
                         )
                     )
+                    
         for item in state["question"][index].rag_rilis_publikasi :
             if item.id in id_keep_rag_dict :
-                state["question"][index].rag_rilis_publikasi_output.append(
-                    RagRilisPublikasi( 
-                        id = item.id,
-                        tipe = item.tipe, 
-                        bps_id  = item.bps_id, 
-                        rl_date = item.rl_date, 
-                        content = item.content, 
-                        score= item.score,
+                if id_keep_rag_dict[item.id]['score'] > 1 :
+                    state["question"][index].rag_rilis_publikasi_output.append(
+                        RagRilisPublikasi( 
+                            id = item.id,
+                            tipe = item.tipe, 
+                            bps_id  = item.bps_id, 
+                            rl_date = item.rl_date, 
+                            content = item.content, 
+                            score = id_keep_rag_dict[item.id]['score'], # FIX 4
+                        )
                     )
-                )
+                
         for item in state["question"][index].ddgs :
             if item.id in id_keep_rag_dict :
                 state["question"][index].ddgs_output.append(
@@ -465,7 +472,7 @@ async def rag_rerank(state):
                     )
                 )
 
-        id_keep_rag.sort(key=lambda item: item["score"], reverse=True)
+        id_keep_rag.sort(key=lambda item: item.get("score", 0), reverse=True)
         id_keep_rag_iddd = []
         for item in id_keep_rag :
             id_keep_rag_iddd.append(item['id'])
@@ -514,7 +521,6 @@ async def rag_answer(state):
                 hasil_txt = await llm_query(prompt,  os.getenv('Whatsapp7600_04_Api_KEY'),config={
                     "response_mime_type": "application/json",
                     "response_json_schema":  {
-                        
                             "type": "object",
                             "properties": {
                                 "jawaban": {
@@ -527,39 +533,34 @@ async def rag_answer(state):
                                     },
                                 }
                             },
-                        
                     },
                 })
-
-                hasil = json.loads(hasil_txt.replace("```",""))
+                hasil = json.loads(clean_json_string(hasil_txt))
                 break
             except Exception as e:
                 logger.info(e)
                 await asyncio.sleep(10)
                 attmpt += 1
+                
         logger.info(hasil)
-        for item_sitasi in hasil['sitasi'] :
-            if isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
+        
+        # FIX 6: Hindari KeyError jika model berhalusinasi menghasilkan ID sitasi yang tidak valid
+        for item_sitasi in hasil.get('sitasi', []) :
+            if item_sitasi in chunks_dict and isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
                 state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
         
-        state["question"][index].answer.append(AnswerModel(type="text", text=hasil['jawaban'], sitasi=hasil['sitasi']))
+        state["question"][index].answer.append(AnswerModel(type="text", text=hasil.get('jawaban', ''), sitasi=hasil.get('sitasi', [])))
         
     return state
 
-INVALID_FILE_CHARS = '/\\?%*:|"<>' # https://en.wikipedia.org/wiki/Filename#Reserved_characters_and_words
+INVALID_FILE_CHARS = '/\\?%*:|"<>'
 
 def secure_filename(filename):
-    # keep only valid ascii chars
     output = list(unicodedata.normalize("NFKD", filename))
-
-    # special case characters that don't get stripped by the above technique
     for pos, char in enumerate(output):
         if char == '\u0141':
             output[pos] = 'L'
         elif char == '\u0142':
             output[pos] = 'l'
-
-    # remove unallowed characters
     output = [c if c not in INVALID_FILE_CHARS else '_' for c in output]
     return "".join(output).encode("ASCII", "ignore").decode()
-       

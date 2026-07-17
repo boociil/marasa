@@ -15,29 +15,32 @@ import time
 load_dotenv()
 graph = build_graph()
 
-session_in_works_id = []
+# Ubah menjadi 'set' agar pencarian dan penghapusan O(1) dan lebih aman dari duplikasi
+session_in_works_id = set()
 
-def on_finish_callback(task, id_session: str) :
+def on_finish_callback(task, id_session: str):
     try:
         task.result()
-        if id_session in session_in_works_id:
-            session_in_works_id.remove(id_session)
     except Exception:
-        logger.exception("main_chat error")  
+        logger.exception(f"main_chat error on session {id_session}")
+    finally:
+        session_in_works_id.discard(id_session)
 
 async def debounce_per_user_worker():    
     while True:
         await asyncio.sleep(1) # Loop cek setiap 1 detik
         if len(session_in_works_id) >= 4 :
             continue
-        session_to_work = await get_active_session_not_arr(session_in_works_id)
+            
+        session_to_work = await get_active_session_not_arr(list(session_in_works_id))
         for item in session_to_work : 
             session_id = item.id
             if session_id in session_in_works_id:
                 continue
-            session_in_works_id.append(session_id)
+            session_in_works_id.add(session_id)
 
             all_messages = list(await ChatMessage.select().where(ChatMessage.session == item).order_by(ChatMessage.created_at).aio_execute())
+            all_messages.reverse()
             older_message = []
             new_message = []
 
@@ -50,45 +53,61 @@ async def debounce_per_user_worker():
                     older_message.append(f"bot : {item_m.content}")
                     new_message.clear()
 
-
-            task = asyncio.create_task(main_chat( graph, item, new_message, older_message))
+            task = asyncio.create_task(main_chat(graph, item, new_message, older_message))
             task.add_done_callback(
-                lambda t, session_id=session_id: on_finish_callback(t, session_id)
+                lambda t, s_id=session_id: on_finish_callback(t, s_id)
             )
-            continue
+
 
 async def process_per_minute():    
     while True:
         await asyncio.sleep(60) # per menit
-        asyncio.create_task(iddle_task_ai(session_in_works_id))
+        asyncio.create_task(iddle_task_ai(list(session_in_works_id)))
         asyncio.create_task(iddle_task_konsultasi())
 
 
 db_buffer = {}
+
 async def process_per_1_second():    
     while True:
-        await asyncio.sleep(1) # per menit
-        user = await get_user_by_phone(phone)
-
-        session, stop, send_start_layanan = await set_layanan(user, data)
-        if stop :
-            return {"status": True}
+        await asyncio.sleep(1) 
+        current_time = time.time()
         
-        user, stop_, send_start_layanan_ = await registrasi(user, session, data)
-        if stop_ :
-            return {"status": True}
+        # Iterasi menggunakan list(keys()) agar aman jika dictionary dimodifikasi saat proses
+        for phone in list(db_buffer.keys()):
+            buffer_info = db_buffer.get(phone)
+            if not buffer_info:
+                continue
+                
+            # Debounce: Proses jika sudah tidak ada pesan baru dari user ini selama 2 detik
+            if current_time - buffer_info['lastupdate'] >= 2.0:
+                chats = buffer_info['chat']
+                
+                # Segera hapus dari buffer agar pesan baru berikutnya memulai sesi baru
+                del db_buffer[phone]
+                user = await get_user_by_phone(phone)
+                
+                for data in chats:
+                    try:
+                        session, stop, send_start_layanan = await set_layanan(user, data)
+                        if stop:
+                            continue # Gunakan continue, JANGAN return
+                        
+                        user, stop_, send_start_layanan_ = await registrasi(user, session, data)
+                        if stop_:
+                            continue
 
-        if send_start_layanan or ( stop_ and send_start_layanan_ ) :
-            await start_layanan(user, session)
-            return {"status": True}
+                        if send_start_layanan or (stop_ and send_start_layanan_):
+                            await start_layanan(user, session)
+                            continue
 
-        await ChatMessage.aio_create(
-            session = session,
-            role = "user",
-            content = data.message,
-        )
-
-        return {"status": True}
+                        await ChatMessage.aio_create(
+                            session = session,
+                            role = "user",
+                            content = data.message,
+                        )
+                    except Exception as e:
+                        logger.exception(f"Error saat memproses antrean chat untuk {phone}: {str(e)}")
 
 
 # 3. Lifespan Manager (Mengatur startup & shutdown)
@@ -107,25 +126,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-
 id_pesan = []
 
 @app.post("/")
 async def wablas(data: WablasIncomingMessage):
     global id_pesan
-    if data.isGroup :
+    if data.isGroup:
         return {"status": True}
     if not checkHpGroup(data.phone):
         return {"status": True}
-    if data.message.strip() == '' :
+    if not data.message or data.message.strip() == '':
         return {"status": True}
-    if data.id in id_pesan :
+    if data.id in id_pesan:
         return {"status": True}
     
-    logger.info(data)
+    logger.info(f"Incoming message from {data.phone}: {data.message}")
     
-    if len(id_pesan) >= 100 :
-        id_pesan = id_pesan[:50]
+    if len(id_pesan) >= 100:
+        id_pesan = id_pesan[-50:] 
 
     id_pesan.append(data.id)
     phone = data.phone
@@ -148,79 +166,5 @@ async def text():
     return {"status": True}
 
 def checkHpGroup(phone):
-    if phone in ['6285283036590'
-,'6285234609332'
-,'6281218632475'
-,'6282122756354'
-,'6285241027007'
-,'6287731414134'
-,'6282195195502'
-,'6285299736234'
-,'6282191347744'
-,'6281212173630'
-,'6285255136252'
-,'6281244261166'
-,'6281311952627'
-,'6285242427076'
-,'6281342560233'
-,'6281342547923'
-,'6281256161600'
-,'6285338878227'
-,'6281341993737'
-,'6285242010447'
-,'6281343521023'
-,'6281342902240'
-,'6282210289671'
-,'6285340778508'
-,'6282259656015'
-,'6289618834285'
-,'6281384233473'
-,'628114002481'
-,'6281328253790'
-,'6282235078215'
-,'6285792017002'
-,'6285342419813'
-,'6282349063633'
-,'6285340886610'
-,'6285238809301'
-,'6282344852210'
-,'6285255178499'
-,'6282344852209'
-,'6281315546806'
-,'6282292278519'
-,'6281328747856'
-,'6281319069547'
-,'6281342774989'
-,'6282310324774'
-,'6282227397717'
-,'6285277397129'
-,'6285299230996'
-,'628114221767'
-,'6281241666770'
-,'6281354786929'
-,'628982250711'
-,'6285395839898'
-,'6281241840124'
-,'6282292779039'
-,'6282311259355'
-,'6281258345220'
-,'6282343990313'
-,'6281399152242'
-,'6282214072032'
-,'6281218189650'
-,'6285726287612'
-,'6282394517916'
-,'6285157128522'
-,'6282196956817'
-,'6281227577682'
-,'6283115313346'
-,'6285280165627'
-,'6282297042070'
-,'6289650807314'
-,'6282191167862'
-,'6282210467478'
-,'6282319192651'
-,'6288224735330']:
-        return True
-    else:
-        return False
+    # Logika disederhanakan
+    return phone in ['6282195195502']

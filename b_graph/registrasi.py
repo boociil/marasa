@@ -28,7 +28,7 @@ def extract_form_data(text: str):
 
     return result
 
-async def registrasi(user: User | None, session: ChatSession, message :WablasIncomingMessage) -> Tuple[User, bool, bool]:
+async def registrasi(user: User | None, session: ChatSession, message: WablasIncomingMessage) -> Tuple[User, bool, bool]:
     logger.info('registrasi')
     phone = message.phone
     nama_lengkap = user.nama_lengkap if user is not None else message.pushName
@@ -37,25 +37,25 @@ async def registrasi(user: User | None, session: ChatSession, message :WablasInc
 
     if user is None:
         stop = True
-        if not shared_cache.get(f'kirim_regis__{session.id}__{phone}', False) :
-            await send_simple_text(phone, Kalimat_Pembuka.format(nama = nama_lengkap))
+        if not shared_cache.get(f'kirim_regis__{session.id}__{phone}', False):
+            await send_simple_text(phone, Kalimat_Pembuka.format(nama=nama_lengkap))
             await send_simple_text(phone, Form_Identitas)
             shared_cache.set(f'kirim_regis__{session.id}__{phone}', True)
         else:
             if 'nama lengkap' not in message.message.lower():
                 await send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
+                return user, stop, send_start_layanan # Tambahan: Hentikan eksekusi jika tidak valid
+
             try:
                 extract_form = extract_form_data(message.message)
                 logger.info(extract_form)
                 
-                # 2. Gunakan .get() agar terhindar dari KeyError jika regex gagal menangkap field
                 email_input = extract_form.get('email', '').strip()
                 nama_input = extract_form.get('nama_lengkap', '').strip()
                 pekerjaan_input = extract_form.get('pekerjaan', '').strip()
                 instansi_input = extract_form.get('instansi', '').strip()
                 tahun_lahir_input = extract_form.get('tahun_lahir', '').strip()
 
-                # 3. Validasi isian kosong dengan variabel yang sudah diamankan
                 if not email_input:
                     raise EmailNotValidError("email kosong")
                 if not nama_input:
@@ -70,15 +70,18 @@ async def registrasi(user: User | None, session: ChatSession, message :WablasInc
                 validate_email(email_input)
                 
                 user = await User.aio_create(
-                    nama = message.pushName,
-                    notelp = phone,
-                    email = email_input,
-                    nama_lengkap = nama_input,
-                    pekerjaan = pekerjaan_input,
-                    instansi = instansi_input,
-                    tahun_lahir = int(tahun_lahir_input),
+                    nama=message.pushName,
+                    notelp=phone,
+                    email=email_input,
+                    nama_lengkap=nama_input,
+                    pekerjaan=pekerjaan_input,
+                    instansi=instansi_input,
+                    tahun_lahir=int(tahun_lahir_input),
                 )
                 send_start_layanan = True
+                
+                stop = False 
+                
             except EmailNotValidError as e:
                 logger.info(f"Error Email: {e}")
                 await send_simple_text(phone, "Mohon maaf email tidak sesuai format\ncontoh : abc@contoh.com")
@@ -87,6 +90,5 @@ async def registrasi(user: User | None, session: ChatSession, message :WablasInc
                 await send_simple_text(phone, "Mohon maaf tahun lahir tidak sesuai format\ncontoh : 1995")
             except Exception as e:
                 await send_simple_text(phone, "Mohon mengisi identitas dengan menyalin form secara lengkap")
-    
      
     return user, stop, send_start_layanan

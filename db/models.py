@@ -47,10 +47,11 @@ async def get_or_create_active_session(phoneNumber: str):
     new_session = await ChatSession.aio_create(phone = phoneNumber)
     return new_session, True
 
-async def get_active_session(phoneNumber: str) -> dict | None:
+
+async def get_active_session(phoneNumber: str) -> ChatSession | None:
     SESSION_TTL_HOURS = 24
     session_cutoff_time = datetime.now() - timedelta(hours=SESSION_TTL_HOURS)
-    ChatSession.aio_get
+   
     try:
         session = await ChatSession.aio_get(
                 (ChatSession.phone == phoneNumber) &
@@ -62,7 +63,7 @@ async def get_active_session(phoneNumber: str) -> dict | None:
     except ChatSession.DoesNotExist:
         return None
 
-async def get_user_by_phone(phoneNumber: str) -> dict | None:
+async def get_user_by_phone(phoneNumber: str) -> User | None:
     try:
         user = await User.aio_get(User.notelp == phoneNumber)
         return user
@@ -86,9 +87,11 @@ async def load_last_messages(session: ChatSession):
 
     return content
 
+
 async def iddle_task_konsultasi():
     one_hour_ago = datetime.now() - timedelta(hours=1)
-    hari_ini = date.today()
+    hari_ini_awal = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
     idle_sessions = list(await ChatSession
         .select(
             ChatSession,
@@ -97,7 +100,7 @@ async def iddle_task_konsultasi():
         .where(
             (ChatSession.layanan == 1) &
             (ChatSession.is_done == False) & 
-            (ChatSession.created_at < hari_ini)
+            (ChatSession.created_at < hari_ini_awal)
         )
         .join(ChatMessage)
         .group_by(ChatSession)
@@ -105,7 +108,7 @@ async def iddle_task_konsultasi():
         .aio_execute()
     )
 
-    for item in idle_sessions :
+    for item in idle_sessions:
         item.is_done = True
         await item.aio_save()
 
@@ -127,12 +130,12 @@ async def iddle_task_ai(session_in_works_id):
         .aio_execute()
     )
 
-    for item in idle_sessions :
+    for item in idle_sessions:
         if item.id in session_in_works_id:
             continue
         last_msg = list(await ChatMessage.select().where(ChatMessage.session == item.id).order_by(ChatMessage.created_at.desc()).aio_execute())
         
-        if last_msg[0].role == 'bot' :
+        if last_msg and last_msg[0].role == 'bot':
             item.is_done = True
             await item.aio_save()
             await send_end_session(item.phone)
@@ -145,21 +148,28 @@ async def get_active_session_not_arr(session_in_works_id):
                      .select(fn.MAX(ChatMessage.id))
                      .group_by(ChatMessage.session))
 
+    # PERBAIKAN: Pisahkan kondisi base dan tambahan untuk menghindari error jika session_in_works_id kosong
+    conditions = (
+        ( (ChatSession.layanan == 2) | (ChatSession.layanan == 3) ) &
+        (ChatSession.is_done == False) &
+        (ChatMessage.id << last_msg_subquery) & # Pastikan ini pesan terakhir
+        (ChatMessage.role == 'user') &          # Role terakhir adalah user
+        (ChatMessage.created_at < five_second_ago) # Sudah lewat 5 detik
+    )
+    
+    if session_in_works_id:
+        conditions = conditions & (ChatSession.id.not_in(session_in_works_id))
+
     batch_sessions = list(await (ChatSession
             .select(ChatSession, ChatMessage)
             .join(ChatMessage)
-            .where(
-                 ( (ChatSession.layanan == 2) | (ChatSession.layanan == 3) ) &
-                (ChatSession.is_done == False) &
-                (ChatMessage.id << last_msg_subquery) & # Pastikan ini pesan terakhir
-                (ChatMessage.role == 'user') &          # Role terakhir adalah user
-                (ChatMessage.created_at < five_second_ago) &    # Sudah lewat 5 detik
-                (ChatSession.id.not_in(session_in_works_id))
-            ))
+            .where(conditions)
+        )
         .aio_execute()
     )
 
     return batch_sessions
+
 
 async def close_24_hour():
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
@@ -173,6 +183,9 @@ async def close_24_hour():
         .aio_execute()
     )
 
-    rows_updated = await  ChatSession.update(is_done=True).where(ChatSession.id.in_(sessions_to_close)).aio_execute()
-
-    print(f"Berhasil menutup {rows_updated} sesi chat yang idle selama 24 jam.")
+    if sessions_to_close:
+        ids_to_close = [s.id for s in sessions_to_close]
+        rows_updated = await ChatSession.update(is_done=True).where(ChatSession.id.in_(ids_to_close)).aio_execute()
+        print(f"Berhasil menutup {rows_updated} sesi chat yang idle selama 24 jam.")
+    else:
+        print("Tidak ada sesi chat idle 24 jam yang perlu ditutup.")
