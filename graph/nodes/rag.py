@@ -55,6 +55,8 @@ E. Bahasa Sektor / Lapangan Usaha Eksekutif:
     - Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan
 E. Wilayah:
     - 6 Kabupaten ➔ Majene, Polewali Mandar, Mamasa, Mamuju, Pasangkayu, Mamuju Tengah
+F. Lainnya :
+    - DDA ➔ Daerah Dalam Angka
 
 ATURAN EKSTRAKSI PERTANYAAN:
 1. Pertahankan bahasa asli dari pertanyaan.
@@ -310,7 +312,7 @@ async def rag_rerank(state):
         for item in state["question"][index].ddgs :
             chunks = append_chunk(chunks_arr, chunks, item.print())
         chunks_arr.append(chunks)
-        
+
         id_keep_rag = []
         for chunks in chunks_arr : 
             # logger.info(chunks)
