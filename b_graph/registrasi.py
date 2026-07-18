@@ -8,24 +8,22 @@ from typing import Tuple
 from wablas.send import send_simple_text
 
 FORM_PATTERNS = {
-    "nama_lengkap": r"^nama\s*lengkap\s*:\s*(.+)$",
-    "email": r"^email\s*:\s*(.+)$",
-    "tahun_lahir": r"^tahun\s*lahir\s*:\s*(\d+)$",
-    "pekerjaan": r"^pekerjaan\s*:\s*(.+)$",
-    "instansi": r"^instansi.*?:\s*(.+)$",
+    "nama_lengkap": re.compile(r"^nama\s*lengkap\s*:\s*(.+)$", re.IGNORECASE),
+    "email": re.compile(r"^email\s*:\s*(.+)$", re.IGNORECASE),
+    "tahun_lahir": re.compile(r"^tahun\s*lahir\s*:\s*(\d+)$", re.IGNORECASE),
+    "pekerjaan": re.compile(r"^pekerjaan\s*:\s*(.+)$", re.IGNORECASE),
+    "instansi": re.compile(r"^instansi.*?:\s*(.+)$", re.IGNORECASE),
 }
 
 def extract_form_data(text: str):
     result = {}
     for line in text.splitlines():
         line = line.strip()
-
         for field, pattern in FORM_PATTERNS.items():
-            match = re.match(pattern, line, re.IGNORECASE)
+            match = pattern.match(line)
             if match:
                 result[field] = match.group(1).strip()
                 break
-
     return result
 
 async def registrasi(user: User | None, session: ChatSession, message: WablasIncomingMessage) -> Tuple[User, bool, bool]:

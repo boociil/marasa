@@ -65,6 +65,9 @@ ATURAN EKSTRAKSI PERTANYAAN (`pertanyaan_asli`):
 4. PECAH PERTANYAAN MULTI-INDIKATOR (SANGAT PENTING): Jika teks meminta beberapa indikator atau topik yang tidak saling berhubungan (misalnya: "data x, y, dan z"), Anda WAJIB memecahnya menjadi beberapa objek JSON (pertanyaan) yang terpisah untuk masing-masing indikator.
 5. Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
 6. Gunakan riwayat percakapan untuk melengkapi konteks kalimat (abaikan jika tidak relevan dengan input saat ini).
+7. Dekomposisi Indikator Turunan
+   Jika indikator yang dicari merupakan hasil rasio atau perhitungan matematis dari indikator lain, otomatis buatkan juga ekstraksi untuk indikator pembentuknya.
+   (Contoh: Jika target adalah "PDRB Per Kapita", maka Anda harus mengekstrak indikator utamanya, sekaligus membuat ekstraksi tambahan untuk "Total PDRB" dan "Jumlah Penduduk").
 
 ATURAN EKSTRAKSI KATA KUNCI (`keyword`):
 1. Ekstrak kata kunci utama yang substansial dan searchable (seperti nama variabel, indikator, konsep, wilayah, entitas, atau periode data).

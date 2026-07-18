@@ -17,7 +17,7 @@ async def llm_query(prompt: str, api_key_s: str, config) -> str:
                 contents=prompt, 
                 config=config
             ),
-            timeout=25.0
+            timeout=60.0
         )
         
         if response and response.text:
