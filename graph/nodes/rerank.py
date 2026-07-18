@@ -15,8 +15,6 @@ API_KEYS = [
     os.getenv('Whatsapp7600_03_Api_KEY', ''),
     os.getenv('Whatsapp7600_05_Api_KEY', ''),
     os.getenv('Whatsapp7600_06_Api_KEY', ''),
-    os.getenv('Whatsapp7600_07_Api_KEY', ''),
-    os.getenv('Whatsapp7600_08_Api_KEY', ''),
 ]
 
 class APIKeyPool:
@@ -54,34 +52,36 @@ async def return_key_after_cooldown(key_pool, data, delay):
     key_pool.queue.put_nowait(data)
 
 async def fetch_chunk_score(ques, chunks, key_pool):
-    prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen dan Ekstraktor Jawaban untuk pipeline RAG..
+    prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen dan Ekstraktor Jawaban untuk pipeline RAG.
 
-    Tugas:
-    1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
-    2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
-    3. Ekstrak atau susun jawaban untuk pertanyaan pengguna yang HANYA didasarkan pada masing-masing chunk yang terpilih tersebut.
-    4. Jawaban harus lengkap dan jangan di perpendek
-    5. Perhatikan pertanyaan dan periode data yang ditanyakan saat menghasilkan jawaban
+    Tugas Utama:
+    1. Evaluasi dan pilih `knowledge chunks` yang secara spesifik relevan untuk menjawab pertanyaan pengguna.
+    2. Berikan skor relevansi (1-100) untuk setiap chunk terpilih.
+    3. Ekstrak dan susun jawaban HANYA berdasarkan informasi yang ada di dalam masing-masing chunk terpilih. Jawaban harus lengkap dan tidak diperpendek.
 
-    Aturan Evaluasi, Filtering, & Scoring:
-    - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
-    - Hapus chunk yang hanya sedikit berkaitan.
-    - Hapus chunk yang tidak membantu menjawab pertanyaan.
-    - Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
-    - Jika tidak ada yang relevan, kembalikan list kosong.
-    - Perhatikan periode data saat memilih chunk
-    - JANGAN menjawab pertanyaan.
-    - Output HARUS JSON saja, tanpa penjelasan.
-    - OUTPUT CUKUP Array dari id pengetahuan
-    - Urutkan dari yang paling relevan
-    - Jangan memilih chunck yang formatnya daftar isi, daftar gambar, daftar tabel, dan daftar pustaka
-    - Berikan skor relevansi dari skala 1 hingga 100 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
-    
+    Aturan Evaluasi, Filtering, & Scoring (SANGAT KETAT):
+    - PENCOCOKAN SEMANTIK: Pertanyaan awam yang bermaksud menanyakan sebuah metrik harus dianggap valid jika data memuat metrik statistik yang menjawab maksud pertanyaan tersebut secara akurat.
+    - SYARAT SKOR 100: Skor 100 HANYA boleh diberikan jika chunk memenuhi KETIGA syarat berikut secara absolut:
+        a) Indikator/topik di chunk SECARA SEMANTIK SAMA/EKUIVALEN dengan maksud indikator yang ditanyakan pengguna.
+        b) Periode waktu/tahun data di chunk SESUAI dengan periode yang ditanyakan.
+        c) Chunk tersebut mampu menjawab pertanyaan secara utuh dan sempurna.
+    - Kurangi skor secara proporsional jika chunk dapat menjawab sebagian, namun informasinya kurang utuh.
+    - Hapus (jangan masukkan ke output) chunk yang:
+        a) Maksud indikatornya secara fundamental berbeda sama sekali atau berbeda periode waktu dengan yang ditanyakan.
+        b) Hanya memuat daftar isi, daftar gambar, daftar tabel, atau daftar pustaka.
+        c) Berisi informasi yang redundan/sama persis dengan chunk yang sudah dinilai sebelumnya.
+        d) Tidak memuat fakta yang bisa dipakai untuk menjawab pertanyaan.
+    - Jika tidak ada satupun chunk yang relevan, kembalikan array kosong: []
+    - Urutkan hasil output dari skor yang paling tinggi (paling relevan) ke yang paling rendah.
 
-    Aturan Output (Sangat Ketat):
-    - Output HARUS berupa JSON array murni.
-    - JANGAN berikan teks pengantar, penutup, atau penjelasan apa pun di luar JSON.
-    - JANGAN gunakan blok kode markdown (seperti ```json ... ```). Langsung keluarkan format JSON-nya saja.
+    Aturan Ekstraksi Jawaban:
+    - JANGAN menggunakan pengetahuan (prior knowledge) di luar teks chunk.
+    - Susun jawaban secara spesifik dan selengkap mungkin berdasarkan teks pada chunk tersebut.
+
+    Aturan Output (Wajib Dipatuhi):
+    - Output HARUS murni berupa JSON array.
+    - JANGAN tambahkan teks pengantar, penutup, atau penjelasan apa pun.
+    - JANGAN gunakan blok kode markdown (seperti ```json atau ```). Langsung keluarkan format teks JSON-nya saja.
 
     Format JSON yang diharapkan:
     [

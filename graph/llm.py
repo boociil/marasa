@@ -10,7 +10,7 @@ async def llm_query(prompt: str, api_key_s: str, config) -> str:
     try:
         client = genai.Client(api_key=api_key_s)
         model = "gemma-4-31b-it"
-        logger.info('llm_query start')
+        # logger.info('llm_query start')
         response = await asyncio.wait_for(
             client.aio.models.generate_content(
                 model=model, 
@@ -21,7 +21,7 @@ async def llm_query(prompt: str, api_key_s: str, config) -> str:
         )
         
         if response and response.text:
-            logger.info('llm_query end (Success)')
+            # logger.info('llm_query end (Success)')
             return response.text
         else:
             # Seringkali error terjadi karena prompt diblokir oleh sistem keamanan Google

@@ -24,7 +24,7 @@ class RagPublikasiBRS(BaseModel):
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
-content : {self.content}
+Data : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -33,7 +33,7 @@ Score : {self.score}
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
-content : {self.content}
+Data : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -44,7 +44,7 @@ Score : {self.score}
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
-Content : {self.jawaban}
+Data : {self.jawaban}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -53,7 +53,7 @@ Score : {self.score}
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.title}
-Content : {self.jawaban}
+Data : {self.jawaban}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -73,7 +73,7 @@ class RagData(BaseModel):
         return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.judul}
-content : {self.content}
+Data : {self.content}
 Url : {self.url}
 Score : {self.score}
 """
@@ -81,7 +81,7 @@ Score : {self.score}
         return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 Judul : {self.judul}
-content : {self.jawaban}
+Data : {self.jawaban}
 Url : {self.url}
 Score : {self.score}
 """
@@ -101,7 +101,7 @@ class RagRilisPublikasi(BaseModel):
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 tipe : {self.tipe}
-content : {self.content}
+Data : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/publication/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -110,7 +110,7 @@ Score : {self.score}
             return f"""ID Pengetahuan :  {self.id}
 jenis : internal
 tipe : {self.tipe}
-content : {self.content}
+Data : {self.content}
 Release : {self.rl_date}
 Link : https://sulbar.bps.go.id/id/pressrelease/{rl_date_split[0]}/{rl_date_split[1]}/{rl_date_split[2]}/{self.bps_id}/pub.html
 Score : {self.score}
@@ -121,12 +121,25 @@ class DDGS(BaseModel):
     snippet: str 
     title: str
     link: str
+    score: float = 0.0
+    jawaban: str = ''
     def print(self):
+        if self.jawaban != '':
+            return self.print_jawaban()
         return f"""ID Pengetahuan :  {self.id}
 jenis : search
 Judul : {self.title}
-snippet : {self.snippet}
+Data : {self.snippet}
 Url : {self.link}
+Score : {self.score}
+"""
+    def print_jawaban(self):
+        return f"""ID Pengetahuan :  {self.id}
+jenis : search
+Judul : {self.title}
+Data : {self.jawaban}
+Url : {self.link}
+Score : {self.score}
 """
 
 class AnswerModel(BaseModel):

@@ -6,6 +6,8 @@ import uuid
 import os
 from _global import logger, BASE_DIR
 from pathlib import Path
+import aiohttp
+from bs4 import BeautifulSoup
 
 search_filter = {
 "$and": [
@@ -49,8 +51,7 @@ async def get_rag_data_arr(query_text_arr, keywords, k_=10):
 
     tasks2 = []
     for doc in results_arr:
-        if int(doc.id.split(':')[-1]) != 0 :
-            tasks2.append(get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']))
+        tasks2.append(get_content_rag_data_by_halaman(doc.metadata['source'], doc.metadata['page']))
     if len(tasks2) > 0 :
         results_per_query_halaman = await asyncio.gather(*tasks2)
         for item_ in results_per_query_halaman :
@@ -183,11 +184,17 @@ async def get_ddgs_arr(query):
             logger.info(f"site:bps.go.id {', '.join(query)}")
             results_list = await search.ainvoke(f"site:bps.go.id {', '.join(query)}")
             return_value = []
-            for res in results_list:
+            async with aiohttp.ClientSession() as session:
+                fetch_tasks = [fetch_web_content(session, res['link']) for res in results_list]
+                web_contents = await asyncio.gather(*fetch_tasks)
+            
+            for res, content in zip(results_list, web_contents):
+            
+                final_text = content if content.strip() != "" else res['snippet']
                 return_value.append(
                     DDGS( 
                         id = str(uuid.uuid4()),
-                        snippet = res['snippet'] ,
+                        snippet = final_text, # Snippet sekarang berisi data lengkap website!
                         title = res['title'],
                         link = res['link'],
                     )
@@ -197,3 +204,23 @@ async def get_ddgs_arr(query):
             logger.info(e)
             gagal += 1
             await asyncio.sleep(2)
+
+async def fetch_web_content(session, url):
+    try:
+        # Gunakan timeout agar tidak hang jika website lambat
+        async with session.get(url, timeout=10) as response:
+            if response.status == 200:
+                html = await response.text()
+                soup = BeautifulSoup(html, "html.parser")
+                
+                # Hapus elemen script dan style agar teks bersih
+                for script in soup(["script", "style"]):
+                    script.extract()
+                    
+                text = soup.get_text(separator=' ', strip=True)
+                
+                # Batasi teks agar tidak menguras token LLM secara ekstrem (misal max 4000 karakter)
+                return text[:4000]
+    except Exception as e:
+        logger.error(f"Gagal mengambil data dari {url}: {e}")
+    return "" # Kembalikan string kosong jika gagal

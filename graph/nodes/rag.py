@@ -8,7 +8,7 @@ import json
 import unicodedata
 from _global import logger
 import asyncio
-from rerank import GLOBAL_KEY_POOL, fetch_chunk_score, append_chunk, clean_json_string
+from graph.nodes.rerank import GLOBAL_KEY_POOL, fetch_chunk_score, append_chunk, clean_json_string
 from itertools import zip_longest
 
 load_dotenv(find_dotenv()) 
@@ -21,7 +21,7 @@ async def pecah_question_and_transform_untuk_rag(state) :
     prompt = f"""Anda adalah Agen Ekstraksi Pertanyaan dan Pengoptimal Kueri tingkat lanjut untuk sistem Retrieval-Augmented Generation (RAG).
 
 TUJUAN:
-Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, lalu LANGSUNG TERJEMAHKAN istilah di dalam pertanyaan tersebut menggunakan Terminologi Resmi BPS (ke dalam field `pertanyaan_asli`). Kemudian hasilkan variasi kueri pencarian yang dioptimalkan dan array kata kunci (keyword) spesifik untuk memaksimalkan relevansi dokumen yang ditarik oleh sistem.
+Analisis teks yang diberikan (dengan mempertimbangkan riwayat percakapan), ekstrak semua pertanyaan eksplisit maupun implisit, lalu LANGSUNG TERJEMAHKAN istilah di dalam pertanyaan tersebut menggunakan Terminologi Resmi BPS. Anda WAJIB melengkapi kalimat pada field `pertanyaan_asli` dengan konteks wilayah dan periode waktu. Kemudian hasilkan variasi kueri pencarian yang dioptimalkan dan array kata kunci (keyword) spesifik untuk memaksimalkan relevansi dokumen yang ditarik oleh sistem.
 
 PANDUAN WAJIB TERMINOLOGI STATISTIK (BPS):
 Setiap istilah awam atau singkatan di bawah ini WAJIB diubah ke istilah resmi BPS, baik di dalam ekstraksi pertanyaan (`pertanyaan_asli`), `kueri_pencarian`, maupun `keyword`:
@@ -35,7 +35,7 @@ B. Ketenagakerjaan:
     - Pengangguran / susah cari kerja / TPT ➔ Tingkat Pengangguran Terbuka
     - Ketersediaan tenaga kerja / TPAK ➔ Angkatan Kerja, Tingkat Partisipasi Angkatan Kerja
     - Orang kerja ➔ Penduduk Bekerja
-    - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔  Pendidikan Tinggi (Diploma I/II/III/Akademi dan Universitas)
+    - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔ Pendidikan Tinggi (Diploma I/II/III/Akademi dan Universitas)
 C. Sosial, Pendidikan, Kesehatan:
     - Kualitas hidup / kesejahteraan / IPM ➔ Indeks Pembangunan Manusia
     - Umur panjang / kesehatan / AHH ➔ Angka Harapan Hidup
@@ -55,54 +55,30 @@ E. Wilayah:
 F. Lainnya :
     - DDA ➔ Daerah Dalam Angka
 
-ATURAN EKSTRAKSI PERTANYAAN:
-1. Pertahankan bahasa asli dari pertanyaan.
+ATURAN KONTEKS WILAYAH & WAKTU OTOMATIS (SANGAT PENTING):
+Jika pertanyaan mencari data dan TIDAK menyebutkan konteks wilayah, Anda WAJIB menyisipkan kata "Sulawesi Barat". Jika TIDAK menyebutkan konteks waktu, Anda WAJIB menyisipkan tahun terbaru "2025" dan "2026". Aturan ini BERLAKU UNTUK KETIGA FIELD (`pertanyaan_asli`, `kueri_pencarian`, dan `keyword`).
+
+ATURAN EKSTRAKSI PERTANYAAN (`pertanyaan_asli`):
+1. Pertahankan maksud kalimat, NAMUN WAJIB sempurnakan kalimatnya dengan memasukkan terjemahan istilah resmi BPS, SERTA menyisipkan konteks wilayah ("Sulawesi Barat") dan waktu ("2025", "2026") jika tidak ada di input asli.
 2. Gabungkan pertanyaan jika memiliki maksud yang sama atau duplikat.
 3. Pertanyaan yang diekstrak tidak selalu harus diakhiri dengan tanda tanya (?).
 4. PECAH PERTANYAAN MULTI-INDIKATOR (SANGAT PENTING): Jika teks meminta beberapa indikator atau topik yang tidak saling berhubungan (misalnya: "data x, y, dan z"), Anda WAJIB memecahnya menjadi beberapa objek JSON (pertanyaan) yang terpisah untuk masing-masing indikator.
 5. Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
 6. Gunakan riwayat percakapan untuk melengkapi konteks kalimat (abaikan jika tidak relevan dengan input saat ini).
 
-
-ATURAN EKSTRAKSI KATA KUNCI (KEYWORD):
+ATURAN EKSTRAKSI KATA KUNCI (`keyword`):
 1. Ekstrak kata kunci utama yang substansial dan searchable (seperti nama variabel, indikator, konsep, wilayah, entitas, atau periode data).
 2. Setiap item dalam array keyword HARUS tepat 1 (satu) kata tunggal. Jika ada frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
-3. Pastikan kata kunci periode waktu/tahun dimasukkan ke dalam array jika ada atau jika ditambahkan secara otomatis.
+3. Pastikan kata kunci wilayah (misal: "Sulawesi", "Barat") dan periode waktu/tahun ("2025", "2026") dimasukkan ke dalam array, baik yang berasal dari input asli maupun dari penambahan otomatis.
 4. ABAIKAN kata kuantitas, agregasi, kata percakapan, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa", "tolong", "carikan").
-5. Keyword tidak boleh singkatan
+5. Keyword tidak boleh berupa singkatan, jabarkan menjadi kata tunggal penyusunnya.
 
-ATURAN OPTIMASI KUERI PENCARIAN RAG:
+ATURAN OPTIMASI KUERI PENCARIAN RAG (`kueri_pencarian`):
 1. Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan. Kueri tidak boleh bergantung pada referensi kata ganti ("itu", "dia").
 2. LARANGAN KERAS VARIASI SUPERFISIAL: JANGAN PERNAH membuat variasi kueri yang dasarnya adalah kalimat yang sama namun hanya ditambahi kata pengisi/basa-basi di depannya (seperti: "data", "angka", "persentase", "statistik", "jumlah", atau "daftar").
 3. PENANGANAN VARIABEL HUBUNGAN: Jika teks mencari HUBUNGAN antar variabel (misal: "hubungan a dan b"), jadikan SATU objek JSON dengan variasi kueri yang mencakup masing-masing variabel dan kueri hubungan keduanya. JANGAN dipecah jika konteksnya adalah korelasi/hubungan.
-4. KONTEKS WILAYAH & WAKTU OTOMATIS: Jika pertanyaan mencari data dan TIDAK ada konteks wilayah, WAJIB tambahkan kata "Sulawesi Barat". Jika TIDAK ada konteks waktu, WAJIB tambahkan tahun terbaru "2025" dan "2026".
-5. EKSPANSI TERMINOLOGI STATISTIK (BPS): Terjemahkan bahasa awam ke istilah resmi BPS, dan perluas singkatan:
-   A. Ekonomi Makro & Kesejahteraan:
-      - Pertumbuhan ekonomi / kemajuan ekonomi ➔ PDRB, Laju Pertumbuhan Ekonomi
-      - Daya beli / pengeluaran warga ➔ PKRT (Pengeluaran Konsumsi Rumah Tangga), Pengeluaran per Kapita
-      - Inflasi / harga naik ➔ IHK (Indeks Harga Konsumen)
-      - Kemiskinan / orang miskin ➔ Persentase Penduduk Miskin (P0), Garis Kemiskinan
-      - Kesenjangan / ketimpangan ➔ Gini Ratio, Distribusi Pendapatan
-   B. Ketenagakerjaan:
-      - Pengangguran / susah cari kerja ➔ TPT (Tingkat Pengangguran Terbuka)
-      - Ketersediaan tenaga kerja ➔ Angkatan Kerja, TPAK (Tingkat Partisipasi Angkatan Kerja)
-      - Orang kerja ➔ Penduduk Bekerja
-      - Perguruan Tinggi / Lulusan Perguruan Tinggi / Kampus ➔  Pendidikan Tinggi (Diploma I/II/III/Akademi dan Universitas)
-   C. Sosial, Pendidikan, Kesehatan:
-      - Kualitas hidup / kesejahteraan ➔ IPM (Indeks Pembangunan Manusia)
-      - Umur panjang / kesehatan ➔ AHH (Angka Harapan Hidup)
-      - Pendidikan / putus sekolah ➔ RLS (Rata-rata Lama Sekolah), HLS (Harapan Lama Sekolah)
-   D. Pertanian & Kesejahteraan Petani:
-      - Kesejahteraan petani ➔ NTP (Nilai Tukar Petani), NTUP (Nilai Tukar Usaha Pertanian)
-      - Hasil panen / produksi tani ➔ Luas Panen, Produktivitas, Produksi
-   E. Bahasa Sektor / Lapangan Usaha Eksekutif:
-      - Industri / pabrik / manufaktur ➔ PDRB Lapangan Usaha Industri Pengolahan
-      - Pariwisata / hotel / restoran / pengunjung ➔ PDRB Lapangan Usaha Penyediaan Akomodasi dan Makan Minum, Tingkat Penghunian Kamar (TPK), Jumlah Wisatawan
-      - Tambang / galian ➔ PDRB Lapangan Usaha Pertambangan dan Penggalian
-      - Jual beli / pasar / perdagangan ➔ PDRB Lapangan Usaha Perdagangan Besar dan Eceran
-      - Bangunan / proyek / infrastruktur ➔ PDRB Lapangan Usaha Konstruksi
-      - Sektor tani / pertanian ➔ PDRB Lapangan Usaha Pertanian, Kehutanan, dan Perikanan
-6. JANGAN mencoba menjawab pertanyaan, tugas Anda HANYA membuat kueri.
+4. Terapkan ATURAN KONTEKS WILAYAH & WAKTU OTOMATIS dan perluasan Terminologi BPS pada setiap variasi kueri.
+5. JANGAN mencoba menjawab pertanyaan, tugas Anda HANYA memformat output ekstraksi kueri ke JSON.
 
 ATURAN OUTPUT (SANGAT KETAT):
 - Anda HANYA boleh merespons dengan format array JSON yang valid.
@@ -112,7 +88,7 @@ ATURAN OUTPUT (SANGAT KETAT):
 FORMAT JSON YANG DIHARAPKAN:
 [
   {{
-    "pertanyaan_asli": "Teks pertanyaan yang telah dirapikan",
+    "pertanyaan_asli": "Teks pertanyaan yang telah dirapikan, dilengkapi istilah resmi BPS, konteks wilayah, dan waktu",
     "kueri_pencarian": [
       "variasi kueri kata kunci panjang 1",
       "variasi kueri kata kunci panjang 2"
@@ -124,55 +100,24 @@ FORMAT JSON YANG DIHARAPKAN:
   }}
 ]
 
-CONTOH SALAH (Jangan Lakukan Ini):
+CONTOH BENAR (PENAMBAHAN KONTEKS OTOMATIS DARI INPUT PENDEK):
+Input User: "data TPAK dan persentase kemiskinan"
+Output:
 [
   {{
-    "pertanyaan_asli": "Jumlah x?",
-    "kueri_pencarian": ["jumlah x Sulawesi Barat 2025 2026", "total x Sulawesi Barat 2025 2026", "x Sulawesi Barat 2025 2026"],
-    "keyword": ["x"]
-  }}
-]
-
-[
-  {{
-    "pertanyaan_asli": "data angka x ke atas menurut kabupaten/kota tahun 2019-2024",
-    "kueri_pencarian": ["angka x ke atas Sulawesi Barat 2019-2024", "persentase penduduk x ke atas kabupaten kota Sulawesi Barat 2019-2024", "statistik x Sulawesi Barat 2019-2024"],
-    "keyword": ["angka", "x", "persentase", "x", "statistik", "x"]
-  }}
-]
-
-(ALASAN SALAH: Ketiga kueri di atas pada dasarnya adalah kalimat yang persis sama, hanya ditambahi kata filler seperti "angka", "persentase penduduk", dan "statistik pendidikan". Ini sangat tidak berguna untuk sistem RAG. Keyword juga kehilangan konteks tahun dan wilayah).
-
-
-CONTOH BENAR:
-[
-  {{
-    "pertanyaan_asli": "data TPAK dan persentase kemiskinan",
+    "pertanyaan_asli": "Data Tingkat Partisipasi Angkatan Kerja (TPAK) dan Persentase Penduduk Miskin di Sulawesi Barat tahun 2025 dan 2026",
     "kueri_pencarian": [
       "Tingkat Partisipasi Angkatan Kerja TPAK Sulawesi Barat 2025 2026",
-      "persentase penduduk miskin kemiskinan Sulawesi Barat 2025 2026"
+      "Persentase Penduduk Miskin kemiskinan Sulawesi Barat 2025 2026"
     ],
     "keyword": [
-      "TPAK",
-      "kemiskinan",
-      "Sulawesi",
-      "Barat",
-      "2025",
-      "2026"
-    ]
-  }},
-  {{
-    "pertanyaan_asli": "hubungannya data TPAK dan persentase kemiskinan dengan pertumbuhan ekonomi",
-    "kueri_pencarian": [
-      "Tingkat Partisipasi Angkatan Kerja TPAK dengan Laju Pertumbuhan Ekonomi PDRB",
-      "korelasi persentase kemiskinan terhadap pertumbuhan ekonomi",
-      "hubungannya data TPAK dan persentase kemiskinan Sulawesi Barat 2025 2026"
-    ],
-    "keyword": [
-      "TPAK",
-      "kemiskinan",
-      "pertumbuhan",
-      "ekonomi",
+      "Tingkat",
+      "Partisipasi",
+      "Angkatan",
+      "Kerja",
+      "Persentase",
+      "Penduduk",
+      "Miskin",
       "Sulawesi",
       "Barat",
       "2025",
@@ -181,24 +126,23 @@ CONTOH BENAR:
   }}
 ]
 
-CONTOH BENAR (PERTANYAAN MULTI-INDIKATOR DIPECAH):
-User: "Saya butuh data kemiskinan dan infrastruktur jalan kabupaten kota."
+CONTOH BENAR (PERTANYAAN MULTI-INDIKATOR DIPECAH & DILENGKAPI KONTEKS):
+Input User: "Saya butuh data kemiskinan dan infrastruktur jalan kabupaten kota."
+Output:
 [
   {{
-    "pertanyaan_asli": "data kemiskinan kabupaten kota",
+    "pertanyaan_asli": "Data Persentase Penduduk Miskin di kabupaten kota Sulawesi Barat tahun 2025 dan 2026",
     "kueri_pencarian": [
-      "Persentase Penduduk Miskin P0 Garis Kemiskinan kabupaten kota Sulawesi Barat 2025 2026",
-      "tingkat kesejahteraan masyarakat prasejahtera Sulawesi Barat",
-      "kemiskinan P0 miskin kabupaten kota 2025 2026"
+      "Persentase Penduduk Miskin Garis Kemiskinan kabupaten kota Sulawesi Barat 2025 2026",
+      "kemiskinan penduduk miskin kabupaten kota Sulawesi Barat 2025 2026"
     ],
-    "keyword": ["kemiskinan", "kabupaten", "kota", "Sulawesi", "Barat", "2025", "2026"]
+    "keyword": ["Persentase", "Penduduk", "Miskin", "kemiskinan", "kabupaten", "kota", "Sulawesi", "Barat", "2025", "2026"]
   }},
   {{
-    "pertanyaan_asli": "data infrastruktur jalan kabupaten kota",
+    "pertanyaan_asli": "Data infrastruktur jalan di kabupaten kota Sulawesi Barat tahun 2025 dan 2026",
     "kueri_pencarian": [
       "kondisi panjang jalan menurut tingkat kewenangan kabupaten kota Sulawesi Barat 2025 2026",
-      "aksesibilitas aspal permukaan jalan rusak baik Sulawesi Barat",
-      "infrastruktur jalan kabupaten kota 2025 2026"
+      "infrastruktur jalan aspal permukaan jalan rusak kabupaten kota Sulawesi Barat 2025 2026"
     ],
     "keyword": ["infrastruktur", "jalan", "kabupaten", "kota", "Sulawesi", "Barat", "2025", "2026"]
   }}
@@ -393,14 +337,17 @@ async def rag_rerank(state):
                 
         for item in state["question"][index].ddgs :
             if item.id in id_keep_rag_dict :
-                state["question"][index].ddgs_output.append(
-                    DDGS( 
-                        id = item.id,
-                        snippet = item.snippet,
-                        title = item.title,
-                        link = item.link,
+                if id_keep_rag_dict[item.id]['score'] > 1 :
+                    state["question"][index].ddgs_output.append(
+                        DDGS( 
+                            id = item.id,
+                            snippet = item.snippet,
+                            title = item.title,
+                            link = item.link,
+                            score = id_keep_rag_dict[item.id]['score'],
+                            jawaban = id_keep_rag_dict[item.id]['jawaban']
+                        )
                     )
-                )
 
         id_keep_rag.sort(key=lambda item: item.get("score", 0), reverse=True)
         id_keep_rag_iddd = []
