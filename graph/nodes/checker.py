@@ -19,7 +19,7 @@ OFF: Jika pesan di luar konteks layanan BPS, bersifat ofensif, tidak relevan (sp
     hasil = "TANYA"
     attmpt = 1
     while True:
-        if attmpt == 4 :
+        if attmpt > 4 :
             raise Exception("Terjadi kesalahan")
 
         respomse_text = await llm_query(prompt, os.getenv('Whatsapp7600_01_Api_KEY'), {})

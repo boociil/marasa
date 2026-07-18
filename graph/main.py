@@ -80,7 +80,10 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
             await session.aio_save()
             return
         #TANYA
-    
+
+        
+        await send_simple_text(user.notelp, "Mohon tunggu sebentar ya, Bapak/Ibu. Sistem AI kami sedang menelusuri ratusan dokumen statistik untuk menjawab pertanyaan Anda. Proses ini mungkin memakan waktu sekitar 1-10 menit. ⏳🙏")
+        
         answer = []
         for item_ques in result['question']:
             for item_answer in item_ques.answer:

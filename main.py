@@ -97,7 +97,7 @@ async def process_per_1_second():
                         if stop_:
                             continue
 
-                        if send_start_layanan or (stop_ and send_start_layanan_):
+                        if send_start_layanan or send_start_layanan_:
                             await start_layanan(user, session)
                             continue
 

@@ -33,7 +33,7 @@ Page"""}
 
 async def get_rag_data_arr(query_text_arr, keywords, k_=10):    
     tasks = [
-        vectorstore_isi_pdf.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(2*k_),lambda_mult=0.5, where_document=search_filter)
+        vectorstore_isi_pdf.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(5*k_),lambda_mult=0.5, where_document=search_filter)
         for item_query in query_text_arr
     ]
     
@@ -118,7 +118,7 @@ async def get_content_rag_data_by_halaman(source, page):
 
 async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
     tasks = [
-        vectorstore_table.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(2*k_),lambda_mult=0.5, where_document=search_filter)
+        vectorstore_table.amax_marginal_relevance_search(item_query, k=k_, fetch_k=(5*k_),lambda_mult=0.5, where_document=search_filter)
         for item_query in query_text_arr
     ]
     
@@ -196,3 +196,4 @@ async def get_ddgs_arr(query):
         except Exception as e:
             logger.info(e)
             gagal += 1
+            await asyncio.sleep(2)

@@ -11,10 +11,13 @@ async def llm_query(prompt: str, api_key_s: str, config) -> str:
         client = genai.Client(api_key=api_key_s)
         model = "gemma-4-31b-it"
         logger.info('llm_query start')
-        response = await client.aio.models.generate_content(
-            model=model, 
-            contents=prompt, 
-            config=config
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model=model, 
+                contents=prompt, 
+                config=config
+            ),
+            timeout=25.0
         )
         
         if response and response.text:

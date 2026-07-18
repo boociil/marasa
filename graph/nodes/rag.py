@@ -5,19 +5,14 @@ from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, RagRilisPublik
 from dotenv import load_dotenv, find_dotenv
 import os
 import json
-import re
 import unicodedata
-from langchain_community.tools import DuckDuckGoSearchResults
 from _global import logger
-from aiolimiter import AsyncLimiter
 import asyncio
+from rerank import GLOBAL_KEY_POOL, fetch_chunk_score, append_chunk, clean_json_string
+from itertools import zip_longest
 
-rate_limit = AsyncLimiter(3, 60)
 load_dotenv(find_dotenv()) 
 
-def clean_json_string(text: str) -> str:
-    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
-    return cleaned
 
 async def pecah_question_and_transform_untuk_rag(state) :
     history = "\n".join(item for item in state["chat_history"] if item.startswith("user"))
@@ -220,7 +215,7 @@ Teks Pengguna:
 
     attmpt = 1
     while True:
-        if attmpt == 4 :
+        if attmpt > 4 :
             raise Exception("Terjadi kesalahan")
         try :
             extract_rag = await llm_query(prompt, os.getenv('Whatsapp7600_02_Api_KEY'),config={
@@ -274,8 +269,8 @@ async def rag_search(state):
 
         ddgs_,docs_pdf, docs_table, docs_rilis_publikasi = await asyncio.gather(
             get_ddgs_arr(query),
-            get_rag_data_arr(query, keywords, 5),
-            get_rag_data_table_arr(query, keywords, 5),
+            get_rag_data_arr(query, keywords, 8),
+            get_rag_data_table_arr(query, keywords, 8),
             get_rag_rilis_publikasi(query, keywords, 5)
         )
 
@@ -286,130 +281,65 @@ async def rag_search(state):
 
     return state
 
-def append_chunk(chunks_arr, chunks, text, max_chars=6000):
-    text = text + "\n\n"
-
-    if not chunks:
-        return text
-
-    if len(chunks) + len(text) <= max_chars:
-        return chunks + text
-
-    chunks_arr.append(chunks)
-    return text
-
 async def rag_rerank(state):
     logger.info(f"rag_rerank : {len(state['question'])}")
     for index, item__ in enumerate(state['question']) :
+        q_data = state["question"][index]
         ques = state["question"][index].ques
 
         chunks_arr = []
         chunks = ""
 
-        for item in state["question"][index].rag_data :
-            chunks = append_chunk(chunks_arr, chunks, item.print())
-        for item in state["question"][index].rag_publikasi_brs :
-            chunks = append_chunk(chunks_arr, chunks, item.print())
-        for item in state["question"][index].rag_rilis_publikasi :
-            chunks = append_chunk(chunks_arr, chunks, item.print())
-        for item in state["question"][index].ddgs :
-            chunks = append_chunk(chunks_arr, chunks, item.print())
-        chunks_arr.append(chunks)
+        for item_data, item_brs, item_rilis, item_ddgs in zip_longest(
+            q_data.rag_data,
+            q_data.rag_publikasi_brs,
+            q_data.rag_rilis_publikasi,
+            q_data.ddgs
+        ):
+            if item_data is not None:
+                chunks = append_chunk(chunks_arr, chunks, item_data.print())
+            
+            if item_brs is not None:
+                chunks = append_chunk(chunks_arr, chunks, item_brs.print())
+                
+            if item_rilis is not None:
+                chunks = append_chunk(chunks_arr, chunks, item_rilis.print())
+                
+            if item_ddgs is not None:
+                chunks = append_chunk(chunks_arr, chunks, item_ddgs.print())
+
+        if chunks:
+            chunks_arr.append(chunks)
+
 
         id_keep_rag = []
-        for chunks in chunks_arr : 
-            # logger.info(chunks)
-            prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen dan Ekstraktor Jawaban untuk pipeline RAG..
 
-    Tugas:
-    1. Evaluasi dan pilih `knowledge chunks` yang benar-benar relevan untuk menjawab pertanyaan.
-    2. Berikan skor relevansi (relevance score) untuk setiap chunk yang dipilih. (0-100)
-    3. Ekstrak atau susun jawaban untuk pertanyaan pengguna yang HANYA didasarkan pada masing-masing chunk yang terpilih tersebut.
-    4. Jawaban harus lengkap dan jangan di perpendek
-    5. Perhatikan pertanyaan dan periode data yang ditanyakan saat menghasilkan jawaban
+        key_pool = GLOBAL_KEY_POOL
+        
+        tasks = [
+            asyncio.create_task(fetch_chunk_score(ques, c, key_pool))
+            for c in chunks_arr
+        ]
 
-    Aturan Evaluasi, Filtering, & Scoring:
-    - Pilih chunk yang berisi fakta yang bisa langsung dipakai untuk menjawab pertanyaan.
-    - Hapus chunk yang hanya sedikit berkaitan.
-    - Hapus chunk yang tidak membantu menjawab pertanyaan.
-    - Hapus chunk jika informasi tidak relevan atau sama dengan chunk sebelumnya
-    - Jika tidak ada yang relevan, kembalikan list kosong.
-    - Perhatikan periode data saat memilih chunk
-    - JANGAN menjawab pertanyaan.
-    - Output HARUS JSON saja, tanpa penjelasan.
-    - OUTPUT CUKUP Array dari id pengetahuan
-    - Urutkan dari yang paling relevan
-    - Jangan memilih chunck yang formatnya daftar isi, daftar gambar, daftar tabel, dan daftar pustaka
-    - Berikan skor relevansi dari skala 1 hingga 100 (100 = Sangat relevan dan langsung menjawab inti pertanyaan, 1 = Hampir tidak relevan).
-    
-
-    Aturan Output (Sangat Ketat):
-    - Output HARUS berupa JSON array murni.
-    - JANGAN berikan teks pengantar, penutup, atau penjelasan apa pun di luar JSON.
-    - JANGAN gunakan blok kode markdown (seperti ```json ... ```). Langsung keluarkan format JSON-nya saja.
-
-    Format JSON yang diharapkan:
-    [
-        {{
-            "id": "string_id_1",
-            "score": 9,
-            "jawaban": "Tuliskan jawaban spesifik untuk pertanyaan pengguna yang ditarik HANYA dari chunk ini."
-        }},
-        {{
-            "id": "string_id_2",
-            "score": 47,
-            "jawaban": "Tuliskan jawaban spesifik untuk pertanyaan pengguna yang ditarik HANYA dari chunk ini."
-        }}
-    ]
-
-    Pertanyaan:
-    {ques}
-
-    Daftar knowledge chunks:
-    {chunks}"""
-            
-            found = False
-            attmpt = 1
-            while True:
-                if attmpt > 4 :
-                    raise Exception("Terjadi kesalahan")
-                try :
-                    async with rate_limit:
-                        id_keep_rag_txt = await llm_query(prompt, os.getenv('Whatsapp7600_03_Api_KEY'),config={
-                            "response_mime_type": "application/json",
-                            "response_json_schema":  {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "id": {
-                                            "type": "string",
-                                        },
-                                        "score": {
-                                            "type": "number",
-                                        },
-                                        "jawaban": {
-                                            "type": "string",
-                                        },
-                                    },
-                                }
-                            },
-                        })
-                        # FIX 3: Robust JSON stripping
-                        id_keep_rag_ = json.loads(clean_json_string(id_keep_rag_txt))
-                        logger.info(id_keep_rag_)
-                        id_keep_rag += id_keep_rag_
-                        break
-                except Exception as e:
-                    logger.info(e)
-                    await asyncio.sleep(20)
-                    attmpt += 1
-
-            for item_score in id_keep_rag :
-                if item_score.get('score', 0) == 100 :
-                    found = True
-            if found :
-                break
+        # 2. Proses task yang selesai lebih dulu (as_completed)
+        for coro in asyncio.as_completed(tasks):
+            try:
+                result = await coro
+                id_keep_rag.extend(result)
+                
+                found_100 = any(item.get('score', 0) == 100 for item in result)
+                
+                if found_100:
+                    logger.info("Skor 100 ditemukan! Membatalkan sisa request ke LLM...")
+                    for task in tasks:
+                        if not task.done():
+                            task.cancel()
+                    break
+                    
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Task asinkron gagal: {e}")
                 
         id_keep_rag_dict = {}
         for item in id_keep_rag :
@@ -503,7 +433,10 @@ async def rag_answer(state):
                 chunks += chunks_dict[id_].print()+'\n\n'
         
         logger.info(chunks)
-        if len(state["question"][index].rag_publikasi_brs_output) + len(state["question"][index].rag_data_output) == 0:
+        if (len(state["question"][index].rag_publikasi_brs_output) + 
+                len(state["question"][index].rag_data_output) + 
+                len(state["question"][index].rag_rilis_publikasi_output) + 
+                len(state["question"][index].ddgs_output)) == 0:
             state["question"][index].answer.append(AnswerModel(type="text", text="Maaf, kami belum menemukan data yang sesuai."))
             continue
         
