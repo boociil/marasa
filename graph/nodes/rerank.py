@@ -25,7 +25,7 @@ class APIKeyPool:
                 # Pasangkan setiap key dengan limiternya masing-masing (2 request per 60 detik)
                 self.queue.put_nowait({
                     "key": key,
-                    "limiter": AsyncLimiter(15, 60) 
+                    "limiter": AsyncLimiter(10, 60) 
                 })
 
 GLOBAL_KEY_POOL = APIKeyPool(API_KEYS)

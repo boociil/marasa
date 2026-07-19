@@ -86,9 +86,9 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
         #TANYA
         
         answer = [] # ques, ans
-        for item_ques in result['question']:
+        for index, item_ques in enumerate(result['question']):
             for item_answer in item_ques.answer:
-                answer.append({'ques': item_ques.ques,  'ans': item_answer})
+                answer.append({'index': index, 'ques': item_ques.ques,  'ans': item_answer})
                 logger.info(item_answer.text)
                 logger.info("")
 
@@ -99,17 +99,17 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
         for item_answer in answer:
             if item_answer['ans'].file_path is None :
                 if len(item_answer['ques']) > 0 and len(result['question']) > 1:
-                    await send_simple_text(user.notelp, f"Pertanyaan :\n{item_answer['ques']}\n\n{item_answer['ans'].text}")
+                    await send_simple_text(user.notelp, f"Pertanyaan :\n{item_answer['index']}. {item_answer['ques']}\n\n{item_answer['ans'].text}")
                 else :
                     await send_simple_text(user.notelp, f"{item_answer['ans'].text}")
             else :
                 if item_answer['ans'].file_path not in path_ori :
                     if len(item_answer['ques']) > 0 and len(result['question']) > 1:
-                        await send_simple_image(user.notelp, f"Pertanyaan :\n{item_answer['ques']}\n\n{item_answer['ans'].text}", item_answer['ans'].file_path)
+                        await send_simple_image(user.notelp, f"Pertanyaan :\n{item_answer['index']}. {item_answer['ques']}\n\n{item_answer['ans'].text}", item_answer['ans'].file_path)
                     else :
                         await send_simple_image(user.notelp, item_answer['ans'].text, item_answer['ans'].file_path)
                     path_ori.append(item_answer['ans'].file_path)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(3)
 
         for item_ques in result['question']:
             for item_answer in item_ques.answer:
