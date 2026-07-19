@@ -9,7 +9,8 @@ load_dotenv(find_dotenv())
 async def checker(state):
     if len(state['chat_history']) == 0 :
         state['session_done'] = False
-        await send_simple_text(state['notelp'], "Mohon tunggu sebentar ya, Bapak/Ibu. Sistem AI kami sedang menelusuri ratusan dokumen statistik untuk menjawab pertanyaan Anda. Proses ini mungkin memakan waktu sekitar 1-10 menit. ⏳🙏")
+        if state['type'] == 'WA' :
+            await send_simple_text(state['notelp'], "Mohon tunggu sebentar ya, Bapak/Ibu. Sistem AI kami sedang menelusuri ratusan dokumen statistik untuk menjawab pertanyaan Anda. Proses ini mungkin memakan waktu sekitar 1-10 menit. ⏳🙏")
         return state
     last_user_msg = state['new_chat'][len(state['new_chat']) - 1]
     prompt = f"""Analisis pesan user berikut: "{last_user_msg}"
@@ -33,7 +34,7 @@ OFF: Jika pesan di luar konteks layanan BPS, bersifat ofensif, tidak relevan (sp
 
     state['check'] = hasil
 
-    if hasil.upper() == 'TANYA' :
+    if hasil.upper() == 'TANYA' and state['type'] == 'WA' :
         await send_simple_text(state['notelp'], "Mohon tunggu sebentar ya, Bapak/Ibu. Sistem AI kami sedang menelusuri ratusan dokumen statistik untuk menjawab pertanyaan Anda. Proses ini mungkin memakan waktu sekitar 1-10 menit. ⏳🙏")
     return state
        

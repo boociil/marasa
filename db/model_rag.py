@@ -63,6 +63,8 @@ class RagData(BaseModel):
     id: str
     judul: str 
     url: str
+    sumber: int
+    table_id: str
     content: str
     score: float
     jawaban: str = ''

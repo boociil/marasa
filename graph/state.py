@@ -3,6 +3,7 @@ from typing import TypedDict, List
 from db.model_rag import QuestionModel, ChatMessage
 
 class BPSState(TypedDict):
+    type: str = 'WA'
     check: str
     
     nama: str

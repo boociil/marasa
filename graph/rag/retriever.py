@@ -2,12 +2,21 @@ from _global import vectorstore_isi_pdf, vectorstore_table, vectorstore_rilis_pu
 import asyncio
 from langchain_community.tools import DuckDuckGoSearchResults
 from db.model_rag import DDGS, RagData, RagPublikasiBRS, RagRilisPublikasi
+import httpx
 import uuid
 import os
 from _global import logger, BASE_DIR
 from pathlib import Path
 import aiohttp
 from bs4 import BeautifulSoup
+import os, re, html
+from dotenv import load_dotenv, find_dotenv
+from graph.nodes.rerank import GLOBAL_KEY_POOL, fetch_chunk_jawaban, append_chunk
+
+load_dotenv(find_dotenv())
+API_KEY = os.getenv("API_BPS")
+DOMAIN = "7600"
+BASE_URL = "https://webapi.bps.go.id/v1/api"
 
 search_filter = {
 "$and": [
@@ -138,12 +147,57 @@ async def get_rag_data_table_arr(query_text_arr, keywords, k_=10):
                     id = str(uuid.uuid4()),
                     judul = doc.metadata['judul'], 
                     url= 'https://sulbar.bps.go.id/id/statistics-table/'+doc.metadata.get("sumber", None)+'/'+doc.metadata.get("table_id", None)+'/data.html', 
+                    sumber=doc.metadata.get("sumber", 0),
+                    table_id=f"{doc.metadata.get("table_id", None)}",
                     content = doc.page_content, 
                     score= 1
                 )
             )
         
     return return_value
+
+async def get_content_rag_data_table_tahun(ques, judul, sumber, table_id , keyword = []):
+    year_arr= sorted([
+        int(x) for x in keyword
+        if (
+            isinstance(x, int) and 1900 <= x <= 2100
+        ) or (
+            isinstance(x, str) and x.isdigit() and 1900 <= int(x) <= 2100
+        )
+    ])
+
+    ar_data = []
+
+    async with httpx.AsyncClient() as client:
+        datas = await get_detail_table(client, table_id, int(sumber), year_arr)
+        if f"{sumber}" == '2':
+            for item_datas in datas:
+                ar_data.append(json_to_text_2(judul, item_datas))
+        elif f"{sumber}" == '3':
+            for item_datas in datas:
+                ar_data.append(json_to_text_3(judul, item_datas))
+    
+    chunks_arr = []
+    chunks = ""
+
+    for item_data in ar_data :
+        chunks = append_chunk(chunks_arr, chunks, item_data)
+
+    if chunks:
+        chunks_arr.append(chunks)
+
+    key_pool = GLOBAL_KEY_POOL
+    
+    tasks = [
+        asyncio.create_task(fetch_chunk_jawaban(ques, c, key_pool))
+        for c in chunks_arr
+    ]
+
+    jawaban_arr = await asyncio.gather(*tasks)
+
+    logger.info(jawaban_arr)
+
+    return "\n".join(jawaban_arr)
 
 async def get_rag_rilis_publikasi(query_text_arr, keywords, k_=10):
     tasks = [
@@ -224,3 +278,222 @@ async def fetch_web_content(session, url):
     except Exception as e:
         logger.error(f"Gagal mengambil data dari {url}: {e}")
     return "" # Kembalikan string kosong jika gagal
+
+async def get_detail_table(client, id , type = 0, year_arr = []):
+    if len(year_arr) == 0 :
+        """Mengambil semua subjek (CSA) yang tersedia"""
+        url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
+        # logger.info(url)
+        while True: 
+            try:
+                response = (await client.get(url)).json()
+                # logger.info(response)
+                if response['status'] == 'OK':
+                    return [response]
+                elif response['status'] == 'Error':
+                    logger.info(response)
+                    return []
+            except Exception as e:
+                logger.info(e)
+            
+    elif type == 2:
+        response_arr = []
+        url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
+        vars_arr = []
+        while True: 
+            try:
+                response = (await client.get(url)).json()
+                # logger.info(response)
+                if response['status'] == 'OK':
+                    vars_arr = response['var']
+                    break
+                elif response['status'] == 'Error':
+                    logger.info(response)
+                    break
+            except Exception as e:
+                logger.info(e)
+
+        for item_var in vars_arr :
+            page_1 = 1
+            pages_1 = 1 
+            tahun_arr = []
+            while page_1 <= pages_1: 
+                # https://webapi.bps.go.id/v1/api/list/model/th/lang/ind/domain/7600/var/491/page/1/key/70b9771878b76e68902b2aa1dffb2084/
+                url_ = f"{BASE_URL}/list/model/th/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/page/{page_1}/key/{API_KEY}/"
+                while True: 
+                    try:
+                        response = (await client.get(url_)).json()
+                        # logger.info(response)
+                        if response['status'] == 'OK':
+                            tahun_arr.extend(response['data'][1])
+                            pages_1 = response['data'][0]['pages']
+                            break
+                        elif response['status'] == 'Error':
+                            logger.info(response)
+                            break
+                    except Exception as e:
+                        logger.info(e)
+                page_1 += 1
+            tahun_arr_ = []
+            for item in tahun_arr :
+                if item in year_arr:
+                    tahun_arr_.append(item)
+            # logger.info(tahun_arr)
+            for item_tahun in tahun_arr_:
+                #https://webapi.bps.go.id/v1/api/list/model/data/lang/ind/domain/7600/var/491/th/109;110/key/70b9771878b76e68902b2aa1dffb2084/
+                url__ = f"{BASE_URL}/list/model/data/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/th/{item_tahun['th_id']}/page/{page_1}/key/{API_KEY}/"
+                while True: 
+                    try:
+                        response = (await client.get(url__)).json()
+                        # logger.info(response)
+                        if response['status'] == 'OK':
+                            response_arr.append(response)
+                            break
+                        elif response['status'] == 'Error':
+                            logger.info(response)
+                            break
+                    except Exception as e:
+                        logger.info(e)
+
+        return response_arr    
+    elif type == 3:
+        response_arr = []
+        index = 0
+        for item_year in year_arr:
+            """Mengambil semua subjek (CSA) yang tersedia"""
+            url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/year/{item_year}/lang/ind/id/{id}/key/{API_KEY}/"
+            # logger.info(url)
+            while True: 
+                try:
+                    response = (await client.get(url)).json()
+                    # logger.info(response)
+                    if response['status'] == 'OK':
+                        response_arr.append(response)
+                        break
+                    elif response['status'] == 'Error':
+                        logger.info(response)
+                        break
+                except Exception as e:
+                    logger.info(e)
+               
+
+            if index == 0 and response is not None and response['status'] == 'OK':
+                if "list_tahun_data" in response['data'][1]:
+                    for item_avail_year in  response['data'][1]['list_tahun_data']:
+                        if int(item_avail_year) not in year_arr :
+                            year_arr.append(int(item_avail_year))
+            index += 1
+        return response_arr    
+    
+
+def json_to_text_2(judul: str, json_data: dict) -> str:
+    variabel = {str(item['val']): item['label'] for item in json_data.get('var', [])}
+    turunan_variabel = {str(item['val']): item['label'] for item in json_data.get('turvar', [])}
+    # Membersihkan tag HTML (seperti <b>) pada label wilayah/vervar
+    vertical_variabel = {str(item['val']): item['label'].replace('<b>', '').replace('</b>', '') for item in json_data.get('vervar', [])}
+    tahun = {str(item['val']): item['label'] for item in json_data.get('tahun', [])}
+    turunan_tahun = {str(item['val']): item['label'] for item in json_data.get('turtahun', [])}
+    
+    data_content = json_data.get('datacontent', {})
+    
+    rows_text =[]
+
+    # 2. Iterasi untuk merangkai kombinasi key dan mencocokkan dengan datacontent
+    for item in json_data.get('var', []):
+        var_val = item['val']
+        var_label = item['label']
+        rows_text.append('Variabel : '+ var_label+ ': ')
+        for turvar_val, turvar_label in turunan_variabel.items():
+            for v_val, v_label in vertical_variabel.items():
+                for thn_val, thn_label in tahun.items():
+                    for turthn_val, turthn_label in turunan_tahun.items():
+                        if turthn_label.lower().strip() == 'tahun' :
+                            turthn_label = ""
+                        if thn_label.lower().strip() == 'tahun' :
+                            thn_label = ""
+
+                        if turvar_label.lower().strip() == 'tidak ada' and  len(turunan_variabel.items()) == 1:
+                            turvar_label = ""
+                        
+                        # BPS menggabungkan value ID untuk membuat key pada datacontent
+                        key = f"{v_val}{var_val}{turvar_val}{thn_val}{turthn_val}"
+                        
+                        # Jika kombinasi key ada di dalam data content, ambil nilainya
+                        if key in data_content:
+                            nilai = data_content[key]
+                            if turvar_label == "" :
+                                rows_text.append(f"- {v_label}, {thn_label} {turthn_label} : {nilai}")
+                            else :
+                                rows_text.append(f"- {v_label}, {thn_label} {turthn_label} -> {turvar_label} : {nilai}")
+        if item['note'].strip() != '':
+            rows_text.append("Catatan : "+item['note'])
+        rows_text.append("")
+                            
+    output = []
+    output.append(f"JUDUL: {judul}")
+    output.append(f"TAHUN: {json_data.get('tahun', [])[0]['label']}")
+    output.append("\n")
+    output.extend(rows_text)
+    output.append("\n")
+
+    
+    return "\n".join(output)
+
+
+
+def json_to_text_3(judul: str, json_data: dict) -> str:    
+    """
+    Mengonversi JSON data BPS menjadi teks narasi yang mudah dibaca.
+    """
+    # Navigasi ke main content (indeks 1 biasanya berisi data tabel)
+    main_content = json_data['data'][1]
+    
+    # 1. Bersihkan Judul dan Metadata
+    def clean_text(text):
+        if not text: return ""
+        # Unescape HTML entities (seperti &lt;) dan hapus tag HTML (seperti <sup>)
+        text = html.unescape(text)
+        return re.sub(r'<[^>]*>', '', text).strip()
+
+    judul = clean_text(main_content.get('judul_tabel', 'Tabel Tanpa Judul'))
+    tahun = main_content.get('tahun_data', '-')
+    wilayah = main_content.get('wilayah', '-')
+    sumber = clean_text(main_content.get('sumber', '-'))
+    
+    # 2. Identifikasi Kolom/Variabel
+    # Map key kolom ke nama variabelnya
+    kolom_map = {}
+    for key, info in main_content['kolom'].items():
+        kolom_map[key] = info['nama_variabel']
+    
+    # 3. Proses Data Baris
+    rows_text = []
+    for item in main_content['data']:
+        label = item['label_raw']
+        var_values = []
+        
+        if isinstance(item['variables'], dict):
+            for var_key, var_data in item['variables'].items():
+                nama_var = kolom_map.get(var_key, "Data")
+                nilai = var_data['value']
+                if item['satuan'] is not None :
+                    nilai = var_data['value'] + item['satuan']
+                var_values.append(f"{nama_var}: {nilai}")
+        else :
+            logger.info("BUKAN DICT "+main_content.get('judul_tabel', 'Tabel Tanpa Judul'))
+
+        
+        rows_text.append(f"- {label} -> " + ", ".join(var_values))
+    
+    # 4. Susun Output Akhir
+    output = []
+    output.append(f"JUDUL: {judul}")
+    output.append(f"WILAYAH: {wilayah}")
+    output.append(f"TAHUN: {tahun}")
+    output.append("\n")
+    output.extend(rows_text)
+    output.append("\n")
+    output.append(f"SUMBER: {sumber}")
+    
+    return "\n".join(output)
+        

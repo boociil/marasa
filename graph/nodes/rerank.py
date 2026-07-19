@@ -1,5 +1,5 @@
 from db.model_rag import RagPublikasiBRS, RagData, RagRilisPublikasi, DDGS
-from graph.llm import llm_query
+from graph.llm import llm_query, llm_query_
 import asyncio
 from _global import logger
 from dotenv import load_dotenv, find_dotenv
@@ -151,4 +151,60 @@ async def fetch_chunk_score(ques, chunks, key_pool):
             await asyncio.sleep(2)  # Jeda sedikit sebelum antre token lagi
 
 
+async def fetch_chunk_jawaban(ques, chunks, key_pool):
+    prompt =f""""Kamu adalah sistem Penilai Relevansi Dokumen dan Ekstraktor Jawaban untuk pipeline RAG.
+
+    Tugas Utama:
+    1. Evaluasi `knowledge chunks` yang diberikan untuk memastikan relevansinya dengan pertanyaan.
+    2. Ekstrak dan susun satu jawaban komprehensif HANYA berdasarkan informasi dari chunk yang paling relevan.
+
+    Aturan Evaluasi & Filtering (SANGAT KETAT):
+    - PENCOCOKAN SEMANTIK: Pertanyaan awam tentang sebuah metrik dianggap valid jika data memuat metrik statistik yang menjawab maksud pertanyaan secara akurat.
+    - RELEVANSI TINGGI: Gunakan chunk yang secara semantik ekuivalen dan periode waktu/tahunnya sesuai dengan yang ditanyakan.
+    - Abaikan chunk yang:
+        a) Maksud indikator atau periode waktunya berbeda sama sekali.
+        b) Hanya memuat daftar isi, daftar gambar, daftar tabel, atau daftar pustaka.
+        c) Tidak memuat fakta yang bisa dipakai untuk menjawab pertanyaan.
+    - Jika tidak ada satupun chunk yang relevan, kembalikan tesk kosong: ""
+
+    Aturan Ekstraksi Jawaban:
+    - JANGAN menggunakan pengetahuan (prior knowledge) di luar teks chunk.
+    - Susun jawaban secara spesifik, jelas, dan selengkap mungkin berdasarkan teks pada chunk. Jika ada beberapa chunk yang relevan, gabungkan informasinya dengan rapi.
+
+    Aturan Output (Wajib Dipatuhi):
+    - Output HARUS murni berupa teks biasa (plain text).
+    - JANGAN format output sebagai JSON atau array.
+    - JANGAN tambahkan teks pengantar (seperti "Berikut adalah jawabannya:"), penutup, atau penjelasan sistem apa pun. Langsung berikan jawaban akhirnya.
+
+    Pertanyaan:
+    {ques}
+
+    Daftar knowledge chunks:
+    {chunks}"""
+            
+    attmpt = 1
+    while True:
+        if attmpt > 4 :
+            raise Exception("Terjadi kesalahan")
+        
+        api_data = await key_pool.queue.get()
+        api_key = api_data["key"]
+        limiter = api_data["limiter"]
+
+        try :
+            async with limiter:
+                relevan_teks = await llm_query_(prompt, api_key)
+                key_pool.queue.put_nowait(api_data)
                 
+                return relevan_teks
+        except asyncio.CancelledError:
+            # JIKA TASK DIBATALKAN KARENA SKOR 100 KETEMU, KEMBALIKAN KEY KE POOL
+            key_pool.queue.put_nowait(api_data)
+            raise
+        except Exception as e:
+            logger.info(f"Attempt {attmpt} failed: {e}")
+            # PERBAIKAN: Hukum API key yang error dengan cooldown 20 detik di background.
+            # Jangan block loop utama dengan `await asyncio.sleep(20)`
+            asyncio.create_task(return_key_after_cooldown(key_pool, api_data, 20))
+            attmpt += 1
+            await asyncio.sleep(2)  # Jeda sedikit sebelum antre token lagi

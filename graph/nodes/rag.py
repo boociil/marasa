@@ -1,4 +1,4 @@
-from graph.rag.retriever import  get_rag_data_arr, get_rag_data_table_arr, get_rag_rilis_publikasi, get_ddgs_arr
+from graph.rag.retriever import  get_rag_data_arr, get_rag_data_table_arr, get_rag_rilis_publikasi, get_ddgs_arr, get_content_rag_data_table_tahun
 from graph.text import LLM_PROMPT
 from graph.llm import llm_query
 from db.model_rag import QuestionModel, RagPublikasiBRS, RagData, RagRilisPublikasi, AnswerModel, DDGS
@@ -65,16 +65,15 @@ ATURAN EKSTRAKSI PERTANYAAN (`pertanyaan_asli`):
 4. PECAH PERTANYAAN MULTI-INDIKATOR (SANGAT PENTING): Jika teks meminta beberapa indikator atau topik yang tidak saling berhubungan (misalnya: "data x, y, dan z"), Anda WAJIB memecahnya menjadi beberapa objek JSON (pertanyaan) yang terpisah untuk masing-masing indikator.
 5. Jangan sertakan penjelasan, kecuali penjelasan tersebut adalah bagian krusial dari konteks pertanyaan.
 6. Gunakan riwayat percakapan untuk melengkapi konteks kalimat (abaikan jika tidak relevan dengan input saat ini).
-7. Dekomposisi Indikator Turunan
-   Jika indikator yang dicari merupakan hasil rasio atau perhitungan matematis dari indikator lain, otomatis buatkan juga ekstraksi untuk indikator pembentuknya.
-   (Contoh: Jika target adalah "PDRB Per Kapita", maka Anda harus mengekstrak indikator utamanya, sekaligus membuat ekstraksi tambahan untuk "Total PDRB" dan "Jumlah Penduduk").
 
-ATURAN EKSTRAKSI KATA KUNCI (`keyword`):
+ATURAN EKSTRAKSI KATA KUNCI (`keyword`) & PERIODE (periode_data):
 1. Ekstrak kata kunci utama yang substansial dan searchable (seperti nama variabel, indikator, konsep, wilayah, entitas, atau periode data).
 2. Setiap item dalam array keyword HARUS tepat 1 (satu) kata tunggal. Jika ada frasa penting (misal: "pertumbuhan ekonomi"), pecah menjadi kata-kata penyusunnya yang bermakna ("pertumbuhan", "ekonomi").
 3. Pastikan kata kunci wilayah (misal: "Sulawesi", "Barat") dan periode waktu/tahun ("2025", "2026") dimasukkan ke dalam array, baik yang berasal dari input asli maupun dari penambahan otomatis.
 4. ABAIKAN kata kuantitas, agregasi, kata percakapan, atau kata tanya (seperti: "jumlah", "total", "angka", "berapa", "kapan", "siapa", "tolong", "carikan").
 5. Keyword tidak boleh berupa singkatan, jabarkan menjadi kata tunggal penyusunnya.
+6. Periode Data: Ekstrak tahun/periode yang dicari ke dalam array string periode_data.
+7. ATURAN RENTANG WAKTU (RANGE): Jika input menyebutkan rentang tahun atau waktu (misal: "2024-2026" atau "2024 sampai 2026"), Anda WAJIB menjabarkan dan menuliskan SEMUA tahun di dalam rentang tersebut secara berurutan (misal menjadi: ["2024", "2025", "2026"]). Penjabaran tahun ini WAJIB dimasukkan ke dalam semua field (pertanyaan_asli, kueri_pencarian, keyword, dan periode_data).
 
 ATURAN OPTIMASI KUERI PENCARIAN RAG (`kueri_pencarian`):
 1. Buat minimal 1 kueri pencarian mandiri (standalone) untuk setiap pertanyaan. Kueri tidak boleh bergantung pada referensi kata ganti ("itu", "dia").
@@ -236,6 +235,7 @@ async def rag_rerank(state):
 
         chunks_arr = []
         chunks = ""
+        id_can_100 = []
 
         for item_data, item_brs, item_rilis, item_ddgs in zip_longest(
             q_data.rag_data,
@@ -245,9 +245,11 @@ async def rag_rerank(state):
         ):
             if item_data is not None:
                 chunks = append_chunk(chunks_arr, chunks, item_data.print())
+                id_can_100.append(item_data.id)
             
             if item_brs is not None:
                 chunks = append_chunk(chunks_arr, chunks, item_brs.print())
+                id_can_100.append(item_data.id)
                 
             if item_rilis is not None:
                 chunks = append_chunk(chunks_arr, chunks, item_rilis.print())
@@ -274,7 +276,10 @@ async def rag_rerank(state):
                 result = await coro
                 id_keep_rag.extend(result)
                 
-                found_100 = any(item.get('score', 0) == 100 for item in result)
+                found_100 = False
+                for item in result:
+                    if item.get('score', 0) == 100 and item.get('id','-----') in id_can_100:
+                        found_100 = True
                 
                 if found_100:
                     logger.info("Skor 100 ditemukan! Membatalkan sisa request ke LLM...")
@@ -318,9 +323,11 @@ async def rag_rerank(state):
                             id = item.id,
                             judul = item.judul,
                             url= item.url,
+                            sumber= item.sumber,
+                            table_id= item.table_id,
                             content = item.content,
                             score = id_keep_rag_dict[item.id]['score'],
-                            jawaban = id_keep_rag_dict[item.id]['jawaban']
+                            jawaban = id_keep_rag_dict[item.id]['jawaban'] if id_keep_rag_dict[item.id]['score'] < 100 else await get_content_rag_data_table_tahun(ques, item.judul, item.sumber, item.table_id, state["question"][index].keyword),
                         )
                     )
                     

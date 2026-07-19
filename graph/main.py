@@ -134,6 +134,7 @@ async def main_chat_cmd(graph, text: list[str], chat_history: list[str]):
     logger.info(text)
     logger.info(chat_history)
     state = {
+        "type": 'cmd',
         "check": 'TANYA',
 
         "nama": '',
