@@ -5,7 +5,7 @@ from db.model_rag import DDGS, RagData, RagPublikasiBRS, RagRilisPublikasi
 import httpx
 import uuid
 import os
-from _global import logger, BASE_DIR
+from _global import logger, BASE_DIR, web_api_cache
 from pathlib import Path
 import aiohttp
 from bs4 import BeautifulSoup
@@ -283,27 +283,51 @@ async def get_detail_table(client, id , type = 0, year_arr = []):
     if len(year_arr) == 0 :
         """Mengambil semua subjek (CSA) yang tersedia"""
         url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
-        # logger.info(url)
+        
+        attempt = 1
         while True: 
+            if attempt > 4:
+                logger.error(f"Gagal mengambil data CSA setelah 4 percobaan: {url}")
+                return []
+            
             try:
+                response = web_api_cache.get(url)
+                if response is not None:
+                    if response['status'] == 'OK':
+                        return response
                 response = (await client.get(url)).json()
-                # logger.info(response)
+                
                 if response['status'] == 'OK':
+                    web_api_cache.set(url, [response], 15*60)
                     return [response]
                 elif response['status'] == 'Error':
                     logger.info(response)
                     return []
             except Exception as e:
                 logger.info(e)
+                await asyncio.sleep(2)
+                attempt += 1
             
     elif type == 2:
         response_arr = []
         url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/lang/ind/id/{id}/key/{API_KEY}/"
         vars_arr = []
+        
+        attempt = 1
         while True: 
+            if attempt > 4:
+                logger.error(f"Gagal mengambil variabel setelah 4 percobaan: {url}")
+                break
+                
             try:
-                response = (await client.get(url)).json()
-                # logger.info(response)
+                response = web_api_cache.get(url)
+                if response is None:
+                    response = (await client.get(url)).json()
+                    if response['status'] == 'OK':
+                        web_api_cache.set(url, response, 15*60)
+
+                logger.info(response)
+                
                 if response['status'] == 'OK':
                     vars_arr = response['var']
                     break
@@ -312,18 +336,30 @@ async def get_detail_table(client, id , type = 0, year_arr = []):
                     break
             except Exception as e:
                 logger.info(e)
+                await asyncio.sleep(2)
+                attempt += 1
 
         for item_var in vars_arr :
             page_1 = 1
             pages_1 = 1 
             tahun_arr = []
             while page_1 <= pages_1: 
-                # https://webapi.bps.go.id/v1/api/list/model/th/lang/ind/domain/7600/var/491/page/1/key/70b9771878b76e68902b2aa1dffb2084/
                 url_ = f"{BASE_URL}/list/model/th/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/page/{page_1}/key/{API_KEY}/"
+                
+                attempt_page = 1
                 while True: 
+                    if attempt_page > 4:
+                        logger.error(f"Gagal mengambil page setelah 4 percobaan: {url_}")
+                        break
+                        
                     try:
-                        response = (await client.get(url_)).json()
-                        # logger.info(response)
+                        # Perbaikan bug: Menggunakan url_, bukan url
+                        response = web_api_cache.get(url_)
+                        if response is None:
+                            response = (await client.get(url_)).json()
+                            if response['status'] == 'OK':
+                                web_api_cache.set(url_, response, 15*60)
+                        
                         if response['status'] == 'OK':
                             tahun_arr.extend(response['data'][1])
                             pages_1 = response['data'][0]['pages']
@@ -333,19 +369,32 @@ async def get_detail_table(client, id , type = 0, year_arr = []):
                             break
                     except Exception as e:
                         logger.info(e)
+                        await asyncio.sleep(2)
+                        attempt_page += 1
                 page_1 += 1
+                
             tahun_arr_ = []
             for item in tahun_arr :
                 if item in year_arr:
                     tahun_arr_.append(item)
-            # logger.info(tahun_arr)
+            
             for item_tahun in tahun_arr_:
-                #https://webapi.bps.go.id/v1/api/list/model/data/lang/ind/domain/7600/var/491/th/109;110/key/70b9771878b76e68902b2aa1dffb2084/
                 url__ = f"{BASE_URL}/list/model/data/lang/ind/domain/{DOMAIN}/var/{item_var['val']}/th/{item_tahun['th_id']}/page/{page_1}/key/{API_KEY}/"
+                
+                attempt_data = 1
                 while True: 
+                    if attempt_data > 4:
+                        logger.error(f"Gagal mengambil data tahun setelah 4 percobaan: {url__}")
+                        break
+                        
                     try:
-                        response = (await client.get(url__)).json()
-                        # logger.info(response)
+                        # Perbaikan bug: Menggunakan url__, bukan url
+                        response = web_api_cache.get(url__)
+                        if response is None:
+                            response = (await client.get(url__)).json()
+                            if response['status'] == 'OK':
+                                web_api_cache.set(url__, response, 15*60)
+                        
                         if response['status'] == 'OK':
                             response_arr.append(response)
                             break
@@ -354,19 +403,32 @@ async def get_detail_table(client, id , type = 0, year_arr = []):
                             break
                     except Exception as e:
                         logger.info(e)
+                        await asyncio.sleep(2)
+                        attempt_data += 1
 
         return response_arr    
+        
     elif type == 3:
         response_arr = []
         index = 0
         for item_year in year_arr:
             """Mengambil semua subjek (CSA) yang tersedia"""
             url = f"{BASE_URL}/view/model/tablestatistic/domain/{DOMAIN}/year/{item_year}/lang/ind/id/{id}/key/{API_KEY}/"
-            # logger.info(url)
+            
+            attempt = 1
+            response = None # Inisialisasi awal agar tidak error di pengecekan bawah
             while True: 
+                if attempt > 4:
+                    logger.error(f"Gagal mengambil data tahunan setelah 4 percobaan: {url}")
+                    break
+                    
                 try:
-                    response = (await client.get(url)).json()
-                    # logger.info(response)
+                    response = web_api_cache.get(url)
+                    if response is None:
+                        response = (await client.get(url)).json()
+                        if response['status'] == 'OK':
+                            web_api_cache.set(url, response, 15*60)
+                    
                     if response['status'] == 'OK':
                         response_arr.append(response)
                         break
@@ -375,16 +437,19 @@ async def get_detail_table(client, id , type = 0, year_arr = []):
                         break
                 except Exception as e:
                     logger.info(e)
+                    await asyncio.sleep(2)
+                    attempt += 1
                
-
-            if index == 0 and response is not None and response['status'] == 'OK':
+            # Gunakan dict.get agar lebih aman jika response ternyata None
+            if index == 0 and response is not None and response.get('status') == 'OK':
                 if "list_tahun_data" in response['data'][1]:
-                    for item_avail_year in  response['data'][1]['list_tahun_data']:
+                    for item_avail_year in response['data'][1]['list_tahun_data']:
                         if int(item_avail_year) not in year_arr :
                             year_arr.append(int(item_avail_year))
             index += 1
-        return response_arr    
-    
+            
+        return response_arr
+     
 
 def json_to_text_2(judul: str, json_data: dict) -> str:
     variabel = {str(item['val']): item['label'] for item in json_data.get('var', [])}

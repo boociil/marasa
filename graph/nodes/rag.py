@@ -209,23 +209,65 @@ Teks Pengguna:
     return state
 
 async def rag_search(state):
-    for index, item in enumerate(state['question']) :
+    tasks = []
+    
+    # 1. Kumpulkan SEMUA task pencarian dari semua pertanyaan ke dalam satu list
+    for index, item in enumerate(state['question']):
         query = state["question"][index].rag_ques
         keywords = state["question"][index].keyword
-
-        ddgs_,docs_pdf, docs_table, docs_rilis_publikasi = await asyncio.gather(
-            get_ddgs_arr(query),
-            get_rag_data_arr(query, keywords, 8),
-            get_rag_data_table_arr(query, keywords, 8),
-            get_rag_rilis_publikasi(query, keywords, 5)
-        )
-
-        state["question"][index].ddgs = ddgs_
-        state["question"][index].rag_publikasi_brs = docs_pdf
-        state["question"][index].rag_data = docs_table
-        state["question"][index].rag_rilis_publikasi = docs_rilis_publikasi
+        
+        tasks.append(get_ddgs_arr(query))
+        tasks.append(get_rag_data_arr(query, keywords, 8))
+        tasks.append(get_rag_data_table_arr(query, keywords, 3))
+        tasks.append(get_rag_rilis_publikasi(query, keywords, 5))
+    
+    if tasks:
+        results = await asyncio.gather(*tasks)
+        
+        # 3. Petakan kembali hasilnya ke masing-masing pertanyaan
+        # Setiap pertanyaan memiliki tepat 4 task berurutan
+        for index, item in enumerate(state['question']):
+            base_idx = index * 4
+            state["question"][index].ddgs = results[base_idx]
+            state["question"][index].rag_publikasi_brs = results[base_idx + 1]
+            state["question"][index].rag_data = results[base_idx + 2]
+            state["question"][index].rag_rilis_publikasi = results[base_idx + 3]
 
     return state
+
+async def process_rag_data_item(item, ques, keyword, score, jawaban_asli):
+    # Jika skor < 100, gunakan jawaban asli dari LLM.
+    # Jika skor == 100, jalankan fetch data secara asinkron.
+    if score < 100:
+        jawaban_akhir = jawaban_asli
+    else:
+        try:
+            # Bungkus fungsi dengan asyncio.wait_for dan beri batas waktu (contoh: 30 detik)
+            jawaban_akhir = await asyncio.wait_for(
+                get_content_rag_data_table_tahun(
+                    ques, item.judul, item.sumber, item.table_id, keyword
+                ),
+                timeout=60.0
+            )
+        except asyncio.TimeoutError:
+            # Jika proses memakan waktu lebih dari 30 detik, jalankan baris ini
+            logger.error(f"Timeout saat mengambil data tabel atau memproses LLM untuk: {item.table_id}")
+            jawaban_akhir = jawaban_asli  # Fallback: gunakan jawaban LLM sebelumnya agar tidak kosong
+        except Exception as e:
+            # Penanganan jika terjadi error lain selain timeout
+            logger.error(f"Error pada get_content_rag_data_table_tahun: {e}")
+            jawaban_akhir = jawaban_asli 
+            
+    return RagData(
+        id=item.id,
+        judul=item.judul,
+        url=item.url,
+        sumber=item.sumber,
+        table_id=item.table_id,
+        content=item.content,
+        score=score,
+        jawaban=jawaban_akhir
+    )
 
 async def rag_rerank(state):
     logger.info(f"rag_rerank : {len(state['question'])}")
@@ -249,7 +291,7 @@ async def rag_rerank(state):
             
             if item_brs is not None:
                 chunks = append_chunk(chunks_arr, chunks, item_brs.print())
-                id_can_100.append(item_data.id)
+                id_can_100.append(item_brs.id)
                 
             if item_rilis is not None:
                 chunks = append_chunk(chunks_arr, chunks, item_rilis.print())
@@ -315,21 +357,25 @@ async def rag_rerank(state):
                         )
                     )
         
-        for item in state["question"][index].rag_data :
-            if item.id in id_keep_rag_dict :
-                if id_keep_rag_dict[item.id]['score'] > 1 :
-                    state["question"][index].rag_data_output.append(
-                        RagData( 
-                            id = item.id,
-                            judul = item.judul,
-                            url= item.url,
-                            sumber= item.sumber,
-                            table_id= item.table_id,
-                            content = item.content,
-                            score = id_keep_rag_dict[item.id]['score'],
-                            jawaban = id_keep_rag_dict[item.id]['jawaban'] if id_keep_rag_dict[item.id]['score'] < 100 else await get_content_rag_data_table_tahun(ques, item.judul, item.sumber, item.table_id, state["question"][index].keyword),
-                        )
+        rag_data_tasks = []
+        for item in state["question"][index].rag_data:
+            if item.id in id_keep_rag_dict:
+                score = id_keep_rag_dict[item.id]['score']
+                if score > 1:
+                    # Kumpulkan task untuk diproses paralel
+                    task = process_rag_data_item(
+                        item=item,
+                        ques=ques,
+                        keyword=state["question"][index].keyword,
+                        score=score,
+                        jawaban_asli=id_keep_rag_dict[item.id]['jawaban']
                     )
+                    rag_data_tasks.append(task)
+        
+        # Eksekusi seluruh task penarikan tabel secara serentak
+        if rag_data_tasks:
+            processed_data = await asyncio.gather(*rag_data_tasks)
+            state["question"][index].rag_data_output.extend(processed_data)
                     
         for item in state["question"][index].rag_rilis_publikasi :
             if item.id in id_keep_rag_dict :
@@ -437,7 +483,7 @@ async def rag_answer(state):
         # FIX 6: Hindari KeyError jika model berhalusinasi menghasilkan ID sitasi yang tidak valid
         for item_sitasi in hasil.get('sitasi', []) :
             if item_sitasi in chunks_dict and isinstance(chunks_dict[item_sitasi], RagPublikasiBRS) :
-                state["question"][index].answer.append(AnswerModel(type="file", text=f"{chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
+                state["question"][index].answer.append(AnswerModel(type="file", text=f"Referensi Dokumen: {chunks_dict[item_sitasi].title}, Hal {chunks_dict[item_sitasi].halaman}", file_path=chunks_dict[item_sitasi].file_path))
         
         state["question"][index].answer.append(AnswerModel(type="text", text=hasil.get('jawaban', ''), sitasi=hasil.get('sitasi', [])))
         

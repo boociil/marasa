@@ -25,7 +25,7 @@ class APIKeyPool:
                 # Pasangkan setiap key dengan limiternya masing-masing (2 request per 60 detik)
                 self.queue.put_nowait({
                     "key": key,
-                    "limiter": AsyncLimiter(2, 60) 
+                    "limiter": AsyncLimiter(15, 60) 
                 })
 
 GLOBAL_KEY_POOL = APIKeyPool(API_KEYS)
@@ -35,7 +35,7 @@ def clean_json_string(text: str) -> str:
     cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
     return cleaned
 
-def append_chunk(chunks_arr, chunks, text, max_chars=10000):
+def append_chunk(chunks_arr, chunks, text, max_chars=25000):
     text = text + "\n\n"
 
     if not chunks:

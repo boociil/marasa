@@ -59,3 +59,4 @@ logger.add(
 
 shared_cache = Cache("cache/share")
 session_in_works = Cache("cache/session_in_works")
+web_api_cache = Cache("cache/web_api")
