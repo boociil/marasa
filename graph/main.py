@@ -49,6 +49,7 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
         user = await get_user_by_phone(session.phone)
 
         state = {
+            "type": 'WA',
             "check": 'TANYA',
 
             "nama": user.nama,
@@ -84,24 +85,30 @@ async def main_chat(graph, session: ChatSession, message: List[str], chat_histor
             return
         #TANYA
         
-        answer = []
+        answer = [] # ques, ans
         for item_ques in result['question']:
             for item_answer in item_ques.answer:
-                answer.append(item_answer)
+                answer.append({'ques': item_ques.ques,  'ans': item_answer})
                 logger.info(item_answer.text)
                 logger.info("")
 
         if len(result['question']) > 0 :
-            answer.append(AnswerModel(type="text", text=ai_disclaimen))
+            answer.append({'ques': '',  'ans': AnswerModel(type="text", text=ai_disclaimen)})
 
         path_ori = []
         for item_answer in answer:
-            if item_answer.file_path is None :
-                await send_simple_text(user.notelp, item_answer.text)
+            if item_answer['ans'].file_path is None :
+                if len(item_answer['ques']) > 0 and len(result['question']) > 1:
+                    await send_simple_text(user.notelp, f"Pertanyaan :\n{item_answer['ques']}\n\n{item_answer['ans'].text}")
+                else :
+                    await send_simple_text(user.notelp, f"{item_answer['ans'].text}")
             else :
-                if item_answer.file_path not in path_ori :
-                    await send_simple_image(user.notelp, item_answer.text, item_answer.file_path)
-                    path_ori.append(item_answer.file_path)
+                if item_answer['ans'].file_path not in path_ori :
+                    if len(item_answer['ques']) > 0 and len(result['question']) > 1:
+                        await send_simple_image(user.notelp, f"Pertanyaan :\n{item_answer['ques']}\n\n{item_answer['ans'].text}", item_answer['ans'].file_path)
+                    else :
+                        await send_simple_image(user.notelp, item_answer['ans'].text, item_answer['ans'].file_path)
+                    path_ori.append(item_answer['ans'].file_path)
             await asyncio.sleep(0.5)
 
         for item_ques in result['question']:
