@@ -3,7 +3,15 @@
 backup
 chroma
 .venv
+/venv
 .env
 data
 cache
 log
+/data
+*.sql.venv/
+.venv/
+venv/
+.venv/
+venv/
+.venv/

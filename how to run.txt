@@ -1,0 +1,12 @@
+@echo off
+
+start "api-data" cmd /k  "cd /d D:\Yan\Code\api-data && uvicorn main:app --reload --port 8080"
+
+start  "chromadb1" cmd /k  "cd /d D:\Yan\Code\api-data && chroma run --path .\chroma\isi_pdf --port 8090"
+
+start  "chromadb2" cmd /k  "cd /d D:\Yan\Code\api-data && chroma run --path .\chroma\table --port 8091"
+
+start  "chromadb3" cmd /k  "cd /d D:\Yan\Code\api-data && chroma run --path .\chroma\daftar_rilis_publikasi --port 8092"
+
+start "ngrok" cmd /k "cd /d D:\Yan\Code\api-data && ngrok http 8080"
+

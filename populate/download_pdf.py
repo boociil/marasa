@@ -8,7 +8,6 @@ import threading
 from tqdm import tqdm
 from datetime import datetime
 
-
 load_dotenv(find_dotenv())
 
 # --- KONFIGURASI ---

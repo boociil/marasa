@@ -48,14 +48,14 @@ async def set_layanan(user: User | None, message: WablasIncomingMessage) -> Tupl
         await session.aio_save()
         send_start_layanan = True
         
-    elif '<~ 3 Chat AI Statistik' in clean_message:
-        if session.layanan == 3:
-            session.is_done = True
-            await session.aio_save()
-            session, baru_status = await get_or_create_active_session(phone)
-        session.layanan = 3
-        await session.aio_save()
-        send_start_layanan = True
+    # elif '<~ 3 Chat AI Statistik' in clean_message:
+    #     if session.layanan == 3:
+    #         session.is_done = True
+    #         await session.aio_save()
+    #         session, baru_status = await get_or_create_active_session(phone)
+    #     session.layanan = 3
+    #     await session.aio_save()
+    #     send_start_layanan = True
 
     if not baru_status:
         if session.layanan == 0:

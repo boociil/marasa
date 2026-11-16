@@ -109,10 +109,10 @@ Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
                                 "title": "2️⃣ Pengaduan",
                                 "description": "Sampaikan keluhan atau kendala terhadap BPS."
                             },
-                            {
-                                "title": "3️⃣ Chat AI Statistik 🤖",
-                                "description": "Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS."
-                            },
+                            # {
+                            #     "title": "3️⃣ Chat AI Statistik 🤖",
+                            #     "description": "Tanya jawab cepat seputar data statistik, publikasi, konsep indikator, dan panduan umum BPS."
+                            # },
                             # {
                             #     "title": "4️⃣ Lainnya",
                             #     "description": "Kebutuhan lain yang belum termasuk menu di atas."
@@ -172,6 +172,44 @@ Untuk membantu kebutuhan Anda, silakan pilih jenis layanan terlebih dahulu :""",
             except httpx.HTTPError as e:
                 # httpx.HTTPError menangkap semua error terkait request dan HTTP status
                 logger.info(f"Request failed: {e}")
+
+async def send_list_message(phone: str, title: str, description: str, button_text: str, rows: list, footer: str = "") -> bool:
+    """Kirim pesan list interaktif (pola sama dengan send_menu).
+
+    Dipakai untuk notifikasi sesi konsultasi ke petugas PST.
+    Return True jika request berhasil.
+    """
+    url = "https://tegal.wablas.com/api/v2/send-list"
+
+    payload = {
+        "data": [
+            {
+                "phone": phone,
+                "message": {
+                    "title": title,
+                    "description": description,
+                    "buttonText": button_text,
+                    "lists": rows,
+                    "footer": footer,
+                },
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"{TOKEN}.{SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            return True
+    except httpx.HTTPError as e:
+        logger.info(f"send_list_message failed ({phone}): {e}")
+        return False
+
 
 async def send_end_session(phone: str) :
     flag = "instant"  # Optional: Enable extended message processing

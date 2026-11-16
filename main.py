@@ -15,12 +15,19 @@ from db.models import (
     ChatMessage,
     close_24_hour,
     get_active_session_not_arr,
+    get_handoff_session,
+    get_petugas_by_phone,
     get_user_by_phone,
 )
 from db.model_wablas import WablasIncomingMessage
 from b_graph.set_layanan import set_layanan
 from b_graph.registrasi import registrasi
 from b_graph.start_layanan import start_layanan
+from b_graph.handoff import (
+    close_idle_handoff_sessions,
+    handle_petugas_message,
+    handle_user_handoff_message,
+)
 
 load_dotenv()
 
@@ -38,12 +45,29 @@ id_pesan_queue = deque(maxlen=200)
 
 ALLOWED_GROUP_NUMBERS = os.getenv(
     "ALLOWED_GROUP_NUMBERS",
-    "6282195195502"
+    # "6282195195502"
+    "6282246657077"
 ).split(",")
 
 
 def checkHpGroup(phone: str):
     return phone in ALLOWED_GROUP_NUMBERS
+
+
+def _log_background(task: asyncio.Task, label: str):
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        logger.exception(f"background task gagal: {label}")
+
+
+def spawn_background(coro, label: str):
+    """Jalankan proses berat di background agar webhook tetap cepat."""
+    task = asyncio.create_task(coro)
+    task.add_done_callback(lambda t: _log_background(t, label))
+    return task
 
 
 ###########################################################################
@@ -307,6 +331,10 @@ async def process_per_minute():
                 iddle_task_konsultasi()
             )
 
+            asyncio.create_task(
+                close_idle_handoff_sessions()
+            )
+
     except asyncio.CancelledError:
 
         logger.info(
@@ -370,16 +398,12 @@ app = FastAPI(
 @app.post("/")
 async def wablas(data: WablasIncomingMessage):
 
+    # Abaikan pesan yang dikirim oleh device bot sendiri.
+    if data.isFromMe:
+        return {"status": True}
+
     # Abaikan pesan group
     if data.isGroup:
-        return {"status": True}
-
-    # Filter nomor yang diizinkan
-    if not checkHpGroup(data.phone):
-        return {"status": True}
-
-    # Abaikan pesan kosong
-    if not data.message or not data.message.strip():
         return {"status": True}
 
     #######################################################################
@@ -396,13 +420,43 @@ async def wablas(data: WablasIncomingMessage):
     id_pesan_queue.append(data.id)
     id_pesan_set.add(data.id)
 
-    #######################################################################
-    # DEBOUNCE
-    #######################################################################
-
     logger.info(
         f"Incoming message [{data.phone}] : {data.message}"
     )
+
+    #######################################################################
+    # ROUTING HANDOFF PETUGAS PST
+    #######################################################################
+
+    # 1. Pengirim adalah petugas (bypass whitelist).
+    petugas = await get_petugas_by_phone(data.phone)
+    if petugas is not None:
+        spawn_background(
+            handle_petugas_message(petugas, data),
+            f"petugas {data.phone}"
+        )
+        return {"status": True}
+
+    # 2 & 3. Pengguna pada sesi layanan 1 (menunggu / live / manual).
+    session_handoff = await get_handoff_session(data.phone)
+    if session_handoff is not None:
+        spawn_background(
+            handle_user_handoff_message(session_handoff, data),
+            f"handoff {data.phone}"
+        )
+        return {"status": True}
+
+    #######################################################################
+    # JALUR LAMA
+    #######################################################################
+
+    # Filter nomor yang diizinkan
+    if not checkHpGroup(data.phone):
+        return {"status": True}
+
+    # Abaikan pesan kosong
+    if not data.message or not data.message.strip():
+        return {"status": True}
 
     await debounce.push(
         data.phone,

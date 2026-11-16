@@ -1,6 +1,7 @@
 from _global import logger
 from db.models import ChatSession, User
 from wablas.send import send_simple_text
+from b_graph.handoff import notify_petugas_new_session, notify_user_handoff_once
 
 async def start_layanan(user: User | None, session: ChatSession | None):
     logger.info("start_layanan")
@@ -12,7 +13,9 @@ async def start_layanan(user: User | None, session: ChatSession | None):
     nama_lengkap = user.nama_lengkap 
     
     if session.layanan == 1:
-        await send_simple_text(phone, f"Mohon tunggu sebentar Bapak/Ibu *{nama_lengkap}* ⏳. Saya teruskan pesan ini ke petugas kami agar segera dibantu. 😊")
+        # Handoff ke petugas PST: notifikasi pengguna + list ke semua petugas.
+        await notify_user_handoff_once(session, user)
+        await notify_petugas_new_session(session, user)
     elif session.layanan == 2:
         await send_simple_text(phone, f"Mohon maaf atas ketidaknyamanannya Bapak/Ibu *{nama_lengkap}* 🙏🏻. Silakan sampaikan pengaduan Anda.")
     elif session.layanan == 3:
